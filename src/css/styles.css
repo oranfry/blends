@@ -1,0 +1,917 @@
+/* General Page Stuff */
+html, body {
+    color: #333;
+    font-size: 14px;
+    margin: 0;
+    padding: 0;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+html {
+    overflow-y: scroll;
+}
+
+body {
+    text-align: center;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #444;
+}
+
+nav {
+    position: relative;
+    display: inline-block;
+    padding: 0.3em;
+    text-align: center;
+    margin-right: 1.2em;
+    margin-left: 1.2em;
+    font-size: 1em;
+    white-space: nowrap;
+    line-height: 1em;
+}
+
+nav a {
+    min-width: 1.25em;
+    display: inline-block;
+    background-color: #ccc;
+    padding: 0;
+    text-decoration: none;
+    color: #333;
+    vertical-align: top;
+    padding: 0.4em;
+}
+
+nav a img {
+    display: inline-block;
+    vertical-align: top;
+    width: 1em;
+    margin: 0;
+}
+
+nav a span {
+    font-size: 2.5em;
+    line-height: 13px;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+}
+
+nav:empty {
+    display: none;
+}
+
+.line {
+    display: inline-block;
+    background-color: #eee;
+    padding: 2em;
+    box-sizing: border-box;
+}
+
+.cvdump input, .cvdump span {
+    font-size: 11px;
+    display: inline;
+    background: transparent;
+    border: none;
+    color: #444;
+    padding: 0;
+    float: left;
+    width: 10em;
+    line-height: 1.5em;
+}
+
+.cvdump span {
+    clear: both;
+}
+
+.cvdump span:after {
+    content: ": ";
+}
+
+.applink {
+    padding: 0;
+    text-decoration: none;
+    text-align: center;
+}
+
+.applink > div {
+    background-repeat: no-repeat;
+    background-position: center center;
+    height: inherit;
+    font-size: 2em;
+}
+
+.icon {
+    display: inline-block;
+    width: 1.2em;
+    height: 1.2em;
+    line-height: 1.2em;
+    font-style: normal;
+    vertical-align: top;
+    position: relative;
+    background-size: contain;
+    background-position: center center;
+    background-repeat: no-repeat;
+    font-weight: bold;
+}
+
+.icon--small {
+    width: 0.8em;
+    height: 0.8em;
+    line-height: 0.8em;
+}
+
+td > .icon {
+    position: relative;
+    top: 0.2em;
+}
+
+.inline-modal nav {
+    margin: 0;
+    padding: 0;
+}
+
+.inline-modal nav a {
+    background: white;
+}
+
+/* general input styles */
+
+input, select, button, .textbox, .button {
+    display: inline-block;
+    appearance: none;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    padding: 0 0.3em;
+    background-color: white;
+    border-radius: 0;
+    color: #333;
+    font-size: 1em;
+    line-height: 1.2em;
+    text-decoration: none;
+}
+
+.button {
+    cursor: pointer;
+}
+
+.button--main {
+    border-style: solid;
+    border-width: 1px;
+}
+
+select {
+    padding-bottom: 1px;
+}
+
+.edit-form p {
+    margin: 0 0 0.5em;
+}
+
+.assoc {
+    text-align: left;
+    display: inline-block;
+    background: #eee;
+    padding: 0;
+    margin-bottom: 1em;
+}
+
+.assoc__overview {
+    padding: 0.5em;
+    cursor: pointer;
+}
+
+.assoc__overview h2 {
+    margin: 0;
+}
+
+
+.assoc__details {
+    margin-bottom: 1em;
+    padding: 0 1em;
+}
+
+.assoc:not(.assoc--open) .assoc__details {
+    display: none;
+}
+
+.assoc:not(.assoc--open) .assoc__overview {
+    background-color: white;
+}
+
+
+.assoc h2 {
+    font-size: 1em;
+}
+
+.new-assoc {
+    cursor: pointer;
+    padding: 0.1em 0.5em;
+}
+
+/* General Tables */
+
+table {
+	border-collapse: collapse;
+    box-sizing: border-box;
+    margin: 0 auto;
+    margin-bottom: 1em;
+}
+
+td, th {
+    vertical-align: top;
+    text-align: left;
+    padding: 0.2em;
+}
+
+th:first-child, td:first-child, td.first-child {
+    padding-left: 0.5em;
+}
+
+th:last-child, td:last-child {
+    padding-right: 0.5em;
+}
+
+tbody, thead, tfoot {
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+}
+
+th.right, td.right {
+    text-align: right;
+}
+
+/*  Easy-to-read Tables */
+
+.easy-table tr:nth-child(2n+1) {
+    background-color: #eee;
+}
+
+.easy-subtables tbody tr:nth-child(2n+1) {
+    background-color: #eee;
+}
+
+.easy-subtables thead {
+    border: none;
+}
+
+.easy-subtables thead th {
+    line-height: 3em;
+    padding: 0;
+}
+
+.easy-table tr.broken td {
+    background-color: #ffcdcd;
+}
+
+.easy-table tr.askew td {
+    background-color: #ffe2cd;
+}
+
+.easy-table td {
+    cursor: default;
+    white-space: nowrap;
+}
+
+/* Modal dialogs */
+
+.modal {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: white;
+    z-index: 10001;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    padding: 2em;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: #eee;
+}
+
+.modal:not(.modal--open) {
+    display: none;
+}
+
+.inline-modal {
+    position: absolute;
+    top: 0.5em;
+    background-color: white;
+    z-index: 10001;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+}
+
+.inline-modal.inline-modal--left {
+    left: 0.5em;
+}
+
+.inline-modal.inline-modal--right {
+    right: 0.5em;
+}
+
+.inline-modal:not(.inline-modal--open) {
+    display: none;
+}
+
+.modal-breakout {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(0, 0, 0, 0.2);
+    z-index: 10000;
+}
+
+/* Textarea not ridiculous size */
+textarea {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* Nutrition tables */
+
+.nutritiontable_statgroup {
+    border-top: 2px solid #333;
+}
+
+.nutritiontable_statgroup, .nutritiontable_columnlabels {
+    padding: 0.4em 0;
+}
+
+.nutritiontable_stat {
+}
+
+/*.nutritiontable_statgroup:nth-child(2n) {
+    background-color: #e7e7e7;
+}
+*/
+.nutritiontable_stat, .nutritiontable_columnlabels {
+    position: relative;
+}
+
+.nutritiontable_label, .nutritiontable_value {
+    float: left;
+    width: 33%;
+}
+
+.nutritiontable_columnlabels {
+    font-weight: bold;
+}
+
+/* Clearfix trick */
+
+.clearfix:after { visibility: hidden; display: block; font-size: 0; content: " "; clear: both; height: 0; }
+.clearfix { display: inline-block; }
+/* start commented backslash hack \*/
+* html .clearfix { height: 1%; }
+* .clearfix { display: block; }
+*/* close commented backslash hack */
+
+/* Messages */
+
+.message, .warning, .error {
+    display: inline-block;
+    padding: 0.4em;
+    margin-bottom: 0.4em;
+}
+
+.error {
+    border: 1px solid #cc9696;
+    background-color: #f9c0c0;
+}
+
+.warning {
+    border: 1px solid #d7d36b;
+    background-color: #f9f698;
+}
+
+.message {
+    border: 1px solid #22e9cd;
+    background-color: #77fff0;
+}
+
+/* Calendar view styles */
+
+.calendar-month {
+    margin-left: auto;
+    margin-right: auto;
+    border-collapse: collapse;
+    border-bottom: 1px solid #ccc;
+}
+
+.calendar-month .eventcell {
+    vertical-align: top;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    padding: 0.5em 0;
+    min-height: 3em;
+}
+
+.calendar-month .cell {
+    display: inline-block;
+    width: 14.28%;
+    box-sizing: border-box;
+}
+
+.calendar-month {
+    line-height: 1.5em;
+}
+
+.calendar-month .dowcell {
+    color: #888;
+    font-weight: normal;
+    line-height: 3em;
+}
+
+.calendar-month .dowcell, .calendar-month .datecell {
+    text-align: center;
+}
+
+.calendar-month .eventcell {
+    text-align: left;
+}
+
+.calendar-month .datecell {
+    line-height: 1.5em;
+    height: 1.5em;
+    color: #666;
+    text-align: center;
+}
+
+.calendar-month .datecell a {
+    color: #666;
+    text-decoration: none;
+}
+
+.calendar-month .daterow {
+    background-color: #ccc;
+}
+
+.calendar-month .eventrow {
+    background: url(/img/calendar-eventrow-bg.png) repeat-y center center;
+    background-size: 100%;
+}
+
+.calendar-month .eventcell a {
+    text-decoration: none;
+}
+
+.calendar-month .col {
+    display: block;
+    color: #333;
+    padding: 0 0.25em;
+    margin: 0 0.2em 0;
+    white-space: nowrap;
+    vertical-align: top;
+}
+
+.calendar-month .col img {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.event, .event a {
+    color: #333;
+}
+
+.calendar-month-title {
+    display: inline-block;
+    font-size: 30px;
+    text-align: center;
+    line-height: 1.5em;
+    color: #444;
+    margin-bottom: 1em;
+    padding: 0 1em;
+}
+
+.calendar-month__icon {
+    display: inline-block;
+    height: 1em;
+    width: 1em;
+    vertical-align: top;
+}
+
+.weekday {
+    text-align: left;
+    display: inline-block;
+    background-color: #eee;
+    margin-bottom: 1em;
+    padding: 2em;
+    min-width: 394px;
+    box-sizing: border-box;
+}
+
+/* Timeline styles */
+
+.facade {
+    color: #777;
+}
+
+.form-row__value {
+    box-sizing: border-box;
+    text-align: left;
+}
+
+.sub_manufacture {
+    display: inline-block;
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 1em;
+    margin: 1em;
+}
+
+.timeline-summary {
+    display: inline-block;
+    background-color: #ddd;
+    padding: 1em;
+    font-family: monospace;
+}
+
+.timeline-summary span + span {
+    margin-left: 3em;
+}
+
+.timeline-summary + .timeline-summary {
+    margin-top: 1.6em;
+}
+
+.regular-form {
+    background-color: #eee;
+    max-width: 40em;
+    margin: 0 auto 2em;
+    padding: 1px 0 1em;
+}
+
+.form-row {
+    position: relative;
+    margin-top: 0.3em;
+}
+
+.form-row__label {
+    float: left;
+    width: 25%;
+    padding-right: 1em;
+    box-sizing: border-box;
+    text-align: right;
+}
+
+.form-row__value {
+    position: relative;
+    float: left;
+    width: 75%;
+    box-sizing: border-box;
+    padding-left: 2em;
+    padding-right: 4em;
+}
+
+.form--even .form-row__label, .form--even .form-row__value {
+    width: 50%;
+}
+
+.form-row__value > input[type="checkbox"]:first-child {
+    position: absolute;
+    left: 0;
+}
+
+.form-row__value input[type="text"], .form-row__value .textbox {
+    width: 100%;
+}
+
+.noedit input, .noedit select, .noedit textarea {
+    appearance: none !important;
+    border: none !important;
+    background-color: transparent;
+}
+
+.noedit input::-webkit-outer-spin-button, .noedit input::-webkit-inner-spin-button {
+    display: none;
+}
+
+.noedit input[type="number"] {
+    -moz-appearance:textfield;
+}
+
+.noedit .fromtoday, .noedit .adhoc-toggle {
+    display: none;
+}
+
+a.incog {
+    text-decoration: none;
+    color: inherit;
+}
+
+.custom-daterange {
+    display: inline-block;
+}
+
+a.cv-manip, .open-custom-daterange {
+    cursor: pointer;
+    user-select: none; -moz-user-select: none; -khtml-user-select: none; -webkit-user-select: none; -o-user-select: none;
+}
+
+.trigger-edit-line, .trigger-edit-record, .trigger-unlink-record, .trigger-delete-record {
+    cursor: pointer;
+}
+
+.printpreview {
+    position: relative;
+    text-align: left;
+    border: 1px solid #333;
+    margin: 0;
+    padding: 1em;
+    display: inline-block;
+    box-sizing: border-box;
+}
+
+.print-line {
+    position: absolute;
+    top: 1em;
+    right: 1em;
+}
+
+input[type="radio"] + label {
+    padding: 0 0.3em;
+    cursor: pointer;
+    user-select: none; -moz-user-select: none; -khtml-user-select: none; -webkit-user-select: none; -o-user-select: none;
+}
+
+input[type="radio"]:checked + label {
+    background-color: #999;
+}
+
+input.likep {
+    border: none;
+    background-color: inherit;
+}
+
+.recordaction-label {
+    font-size: 0.9em;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    display: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    margin: 0;
+}
+
+tr.selected.ghost td {
+    color: #888;
+}
+
+.sidebar-backlink, .navbar-backlink {
+    text-decoration: none;
+    color: #333;
+}
+
+.sidebar-backlink:before, .navbar-backlink:before {
+    content: "< ";
+}
+
+.navbar-backlink {
+    position: absolute;
+    line-height: 2.25em;
+    top: 1.125em;
+    left: 0.5em;
+    text-decoration: none;
+    color: #333;
+}
+
+.sidebar-backlink {
+    display: block;
+    margin-bottom: 1em;
+}
+
+.filter {
+    display: block;
+    background: #ccc;
+    padding: 0.1em 0.3em;
+    margin: 0.5em 0;
+    cursor: pointer;
+}
+
+.filter i {
+    float: right;
+}
+
+.filter h5, .filter span {
+    display: inline-block;
+    vertical-align: top;
+    margin: 0;
+}
+
+
+.filter--add {
+    background: transparent;
+}
+
+.drnav {
+    display: inline-block;
+}
+
+.navset {
+    display: inline-block;
+    cursor: pointer;
+    position: relative;
+}
+
+.navset:not(.navset--nobar):before {
+    display: inline-block;
+    width: 0;
+    height: 1em;
+    border-left: 1px solid #aaa;
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+    content: "";
+}
+
+.navset.navset--nobar:before {
+    display: inline-block;
+    width: 0;
+    height: 1em;
+    border-left: 1px solid transparent;
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+    content: "";
+}
+
+.navbar {
+    text-align: center;
+    padding: 0.5em;
+    background: #ccc;
+    margin-bottom: 1em;
+}
+
+.nav-dropdown--spacey {
+    margin: 1em;
+}
+
+.nav-dropdown a {
+    display: block;
+    white-space: nowrap;
+    text-decoration: none;
+    color: #444;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+
+.nowrap {
+    white-space: nowrap;
+}
+
+@media screen {
+    .wrapper {
+        max-width: 960px;
+        margin: 0 auto;
+    }
+
+    nav a img, .icon {
+        filter: grayscale(100%) brightness(0.5);
+        -webkit-filter: grayscale(100%) brightness(0.5);
+    }
+
+    nav a span, .event img {
+        filter: grayscale(100%);
+        -webkit-filter: grayscale(100%);
+    }
+
+    .facade .icon {
+        filter: grayscale(100%) brightness(0.97);
+        -webkit-filter: grayscale(100%) brightness(0.97);
+    }
+}
+
+@media print {
+    /* Hide Nav */
+
+    nav { display: none }
+
+    /* Make it look like a document not a form */
+
+    input, select, textarea {
+        appearance: none !important;
+        border: none !important;
+        background-color: transparent;
+    }
+
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
+        display: none;
+    }
+
+    input[type="number"] {
+        -moz-appearance:textfield;
+    }
+
+    .printhide {
+        display: none;
+    }
+
+    .sidebar-backlink, .navbar-backlink {
+        display: none;
+    }
+
+    .calendar-month {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    .calendar-month .cell {
+        border-top: 3px solid #999;
+        border-left: 3px solid #999;
+    }
+
+    .calendar-month .cell:last-child {
+        border-right: 3px solid #999;
+    }
+
+    .calendar-month .row:last-child .cell {
+        border-bottom: 3px solid #999;
+    }
+
+    .calendar-month .eventcell {
+        padding: 1em;
+    }
+
+    td, th {
+        vertical-align: top;
+        text-align: left;
+        padding: 0.05em 1em;
+    }
+}
+
+@media screen and (max-width: 449px) {
+    .sidebar-backlink {
+        display: none;
+    }
+
+    .calendar-month thead {
+        border-top: none;
+    }
+}
+
+@media screen and (min-width: 800px) {
+    .navbar-backlink {
+        display: none;
+    }
+
+    .modal {
+        left: 2em;
+        right: 2em;
+        top: 2em;
+        bottom: 2em;
+    }
+
+    .easy-table {
+        min-width: 400px;
+    }
+
+    .easy-table td.nsacrifice, .easy-table th.nsacrifice {
+        display: none;
+    }
+
+    tbody, thead, tfoot, .calendar-month {
+        border-left: 1px solid #ccc;
+        border-right: 1px solid #ccc;
+    }
+
+    .calendar-month {
+        border-top: 1px solid #ccc;
+        width: 100%;
+    }
+}
+
+@media screen and (max-width: 799px) {
+    .only-wide {
+        display: none;
+    }
+
+    .sidebar-backlink {
+        display: none;
+    }
+
+    .easy-table, .easy-subtables, .calendar-month {
+        width: 100%;
+    }
+
+    .easy-table td.sacrifice, .easy-table th.sacrifice {
+        display: none;
+    }
+
+    .easy-subtables thead th {
+        padding-left: 0.5em;
+        padding-right: 0.5em;
+    }
+
+    .calendar-month .eventcell img {
+        display: none;
+    }
+
+    .calendar-month .eventcell {
+        font-size: 0.7em;
+    }
+}

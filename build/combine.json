@@ -1,0 +1,22 @@
+{
+    "js": {
+        "into": "../public/js",
+        "basename": "app",
+        "extension": "js",
+        "files": [
+            "../node_modules/jquery/dist/jquery.min.js",
+            "../src/js/graph.js",
+            "../src/js/blends.js"
+        ]
+    },
+    "css": {
+        "into": "../public/css",
+        "basename": "styles",
+        "extension": "css",
+        "files": [
+            "../src/css/styles.css",
+            "../src/css/login.css",
+            "php:../src/php/script/iconcss.php"
+        ]
+    }
+}
