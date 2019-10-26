@@ -1,0 +1,42 @@
+<?php
+define('PRINTER_FILE', BLENDS_HOME . '/printme');
+// define('DEBUG_CI', true);
+
+class config_myblends
+{
+    public $password = 'WebPassw0rd!';
+    public $highlight = '895c96';
+
+    public function __construct()
+    {
+        $this->db_creds = (object) [
+            'db' => 'myblends',
+            'username' => 'myblends',
+            'password' => 'MySQLPassw0rd!',
+            'host' =>'127.0.0.1',
+        ];
+        $this->plugins = [
+            'myblends',
+            'builtin',
+        ];
+        $this->periods = [
+            'week',
+            'month',
+            'year',
+            'day',
+            'alltime',
+        ];
+        $this->blends = [
+            'ledger',
+        ];
+        $this->nav = [
+            (object) [
+                'app' => 'blender',
+                'params' => ['blend' => 'ledger',],
+                'icon' => 'dollar',
+            ],
+        ];
+    }
+}
+
+return new config_myblends();
