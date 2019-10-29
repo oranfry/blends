@@ -30,13 +30,6 @@ class config_myblends
         $this->blends = [
             'ledger',
         ];
-        $this->nav = [
-            (object) [
-                'app' => 'blender',
-                'params' => ['blend' => 'ledger',],
-                'icon' => 'dollar',
-            ],
-        ];
     }
 }
 
