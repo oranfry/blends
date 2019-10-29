@@ -9,7 +9,7 @@ Get the built-in plugins
 
 # mkdir myblends.example.com/plugins
 # cd myblends.example.com/plugins
-# git clone git@github.com:oranfry/blends.git builtin
+# git clone git@github.com:oranfry/blends-builtin-plugins.git builtin
 
 Set up your web server to point to the "public" subfolder
 DocumentRoot /var/www/myblends.example.com/public
