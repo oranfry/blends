@@ -4,15 +4,16 @@ define('PRINTER_FILE', BLENDS_HOME . '/printme');
 
 class config_myblends
 {
-    public $password = 'WebPassw0rd!';
+    public $password = ''; // Set a web password here
     public $highlight = '895c96';
 
     public function __construct()
     {
+        $this->instance_name = 'My Blends';
         $this->db_creds = (object) [
             'db' => 'myblends',
             'username' => 'myblends',
-            'password' => 'MySQLPassw0rd!',
+            'password' => '', // specify mysql password here
             'host' =>'127.0.0.1',
         ];
         $this->plugins = [
