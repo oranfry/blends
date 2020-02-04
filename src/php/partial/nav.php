@@ -4,16 +4,19 @@
         <div>
             <?php if (BACK): ?><a class="sidebar-backlink" href="<?= BACK ?>">Back</a></a><?php endif ?>
             <?php if (defined('BLEND_NAME')): ?>
-                <div class="navset">
-                    <div class="inline-modal">
-                        <div class="nav-dropdown">
-                            <?php foreach (Config::get()->blends as $blendname): ?>
-                                <a href="/blend/<?= $blendname ?>" <?= $blendname == BLEND_NAME ? 'class="current"' : ''?> value="<?= $blendname ?>"><?= Blend::load($blendname)->label ?></a>
-                            <?php endforeach ?>
+                <?php $blends = Config::get()->blends; ?>
+                <?php if (count($blends) > 1): ?>
+                    <div class="navset">
+                        <div class="inline-modal">
+                            <div class="nav-dropdown">
+                                <?php foreach (Config::get()->blends as $blendname): ?>
+                                    <a href="/blend/<?= $blendname ?>" <?= $blendname == BLEND_NAME ? 'class="current"' : ''?> value="<?= $blendname ?>"><?= Blend::load($blendname)->label ?></a>
+                                <?php endforeach ?>
+                            </div>
                         </div>
+                        <span class="inline-modal-trigger"><?= Blend::load(BLEND_NAME)->label ?></span>
                     </div>
-                    <span class="inline-modal-trigger"><?= Blend::load(BLEND_NAME)->label ?></span>
-                </div>
+                <?php endif ?>
                 <?php
                     foreach (ContextVariableSet::getAll() as $active) {
                         $active->tinydisplay();
