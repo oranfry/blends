@@ -22,7 +22,7 @@ $adhocfilters = ContextVariableSet::get('adhocfilters');
             </div>
             <i class="inline-modal-trigger icon icon--mono icon--plus"></i>
         <?php else: ?>
-            <i class="icon icon--plus modal-trigger" data-for="bulk-add-modal" data-linetype="<?= $types[0] ?>"></i>
+            <i class="icon icon--plus modal-trigger" data-for="bulk-add-modal_<?= $types[0] ?>"></i>
         <?php endif ?>
     <?php endif ?>
 
