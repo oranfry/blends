@@ -684,7 +684,6 @@ tr.selected.ghost td {
 
 .sidebar-backlink {
     display: block;
-    margin-bottom: 1em;
 }
 
 .filter {
@@ -820,10 +819,6 @@ tr.selected.ghost td {
         display: none;
     }
 
-    .sidebar-backlink, .navbar-backlink {
-        display: none;
-    }
-
     .calendar-month {
         border-collapse: collapse;
         width: 100%;
@@ -854,20 +849,12 @@ tr.selected.ghost td {
 }
 
 @media screen and (max-width: 449px) {
-    .sidebar-backlink {
-        display: none;
-    }
-
     .calendar-month thead {
         border-top: none;
     }
 }
 
 @media screen and (min-width: 800px) {
-    .navbar-backlink {
-        display: none;
-    }
-
     .modal {
         left: 2em;
         right: 2em;
@@ -896,10 +883,6 @@ tr.selected.ghost td {
 
 @media screen and (max-width: 799px) {
     .only-wide {
-        display: none;
-    }
-
-    .sidebar-backlink {
         display: none;
     }
 
