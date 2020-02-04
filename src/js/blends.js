@@ -316,6 +316,8 @@
 
             prevNavsetTop = navsetTop;
         });
+
+        $('.navbar-placeholder').height($('.navbar').outerHeight() + 'px');
     };
 
     $(window).on('resize', onResize);

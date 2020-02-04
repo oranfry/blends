@@ -1,3 +1,4 @@
+<div class="navbar-placeholder">&nbsp;</div>
 <div class="instances navbar printhide">
     <form id="instanceform" action="/change-instances" method="post">
         <div>
