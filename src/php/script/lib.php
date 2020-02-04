@@ -521,13 +521,12 @@ function lines_prepare_search(
     $parentLinks = [];
     $parentTypeSelectors = [];
     $parentLinetypes = find_parent_linetypes($linetype->name, $children);
-    $parentLinetype = @$parentLinetypes[0];
 
-    if ($parentLinetype) {
-        $parentLinks[] = $children[0]->parent_link;
-        $reverse[] = $children[0]->parent_link;
-        $parentlink = Tablelink::load($children[0]->parent_link);
-        $parentTypeSelectors[] = "if({$parentlink->ids[0]}_id, '{$parentlink->ids[0]}', '')";
+    foreach ($parentLinetypes as $i => $parentLinetype) {
+        $parentLinks[] = $children[$i]->parent_link;
+        $reverse[] = $children[$i]->parent_link;
+        $parentlink = Tablelink::load($children[$i]->parent_link);
+        $parentTypeSelectors[] = "if({$parentlink->ids[0]}.id, '{$parentlink->name}', '')";
     }
 
     $orderbys = ["t.{$idField}"];
@@ -1051,9 +1050,9 @@ function find_parent_linetypes($linetype_name, &$child_descriptors)
 
             $seen[$_linetype_name] = true;
             $_linetype = Linetype::load($_linetype_name);
-            $me = @filter_objects($_linetype->children, 'linetype', 'is', $linetype_name)[0];
+            $mes = @filter_objects($_linetype->children, 'linetype', 'is', $linetype_name);
 
-            if ($me) {
+            foreach ($mes as $me) {
                 $parents[] = $_linetype;
                 $child_descriptors[] = $me;
             }
