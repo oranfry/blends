@@ -234,7 +234,9 @@ foreach ($dates as $date) {
     $orderByClause = implode(', ', $orderbys);
     $fieldsClause = implode(', ', array_map(function ($v) {
         return "{$v->fuse} `{$v->name}`";
-    }, $linetype->fields));
+    }, array_filter($linetype->fields, function($v){
+        return $v->type != 'file';
+    })));
     $updatesClause = implode(', ', $updates);
     $joinTablesClause = implode(', ', $joinTables);
 

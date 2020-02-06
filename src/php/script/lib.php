@@ -465,9 +465,14 @@ function find_lines(
     $fieldsClause = array_merge(
         ['t.id id'],
         $idClauses,
-        array_map(function ($v) {
-            return "{$v->fuse} `{$v->name}`";
-        }, $linetype->fields),
+        array_map(
+            function ($v) {
+                return "{$v->fuse} `{$v->name}`";
+            },
+            array_filter($linetype->fields, function($v){
+                return $v->type != 'file';
+            })
+        ),
         $parentTypeSelectors ? ['concat(' . implode(', ', $parentTypeSelectors) . ') parenttype'] : []
     );
 
