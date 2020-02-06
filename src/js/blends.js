@@ -420,17 +420,57 @@
 
         url += '/save';
 
-        $.ajax(url, {
-            method: 'post',
-            contentType: false,
-            processData: false,
-            data: formData,
-            success: function(data) {
-                window.location.href = back;
-            },
-            error: function(data){
-                alert(data.responseJSON.error);
+        var data = Object.fromEntries(formData);
+
+        var handleSave = function() {
+            $.ajax(url, {
+                method: 'post',
+                contentType: false,
+                processData: false,
+                data: JSON.stringify(data),
+                success: function(data) {
+                    window.location.href = back;
+                },
+                error: function(data){
+                    alert(data.responseJSON.error);
+                }
+            });
+        };
+
+        var $fileInputs = $form.find('input[type="file"]');
+        var numLoadedFiles = 0;
+
+        if (!$fileInputs.length) {
+            handleSave();
+        }
+
+        $fileInputs.each(function(){
+            var $input = $(this);
+            var file = $input[0].files[0];
+            delete data[$input.attr('name')];
+
+            if (!file) {
+                numLoadedFiles++;
+
+                if (numLoadedFiles == $fileInputs.length) {
+                    handleSave();
+                }
+
+                return;
             }
+
+            var reader = new FileReader();
+
+            reader.onload = function(event) {
+                data[$input.attr('name')] = btoa(event.target.result);
+                numLoadedFiles++;
+
+                if (numLoadedFiles == $fileInputs.length) {
+                    handleSave();
+                }
+            };
+
+            reader.readAsBinaryString(file);
         });
     });
 

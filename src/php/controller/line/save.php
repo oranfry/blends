@@ -5,6 +5,7 @@ define('LAYOUT', 'json');
 
 $linetype = Linetype::load(LINETYPE_NAME);
 $linetype_db_table = Table::load($linetype->table)->table;
+$line_template =  json_decode(file_get_contents('php://input'));
 $datefield = null;
 
 foreach ($linetype->fields as $field) {
@@ -21,7 +22,7 @@ if ($datefield && defined('BULK_ADD')) {
 }
 
 foreach ($dates as $date) {
-    $line = (object) array_merge($_POST, LINE_ID ? ['id' => LINE_ID] : []);
+    $line = clone $line_template;
 
     if ($datefield && defined('BULK_ADD')) {
         $line->{$datefield->name} = $date;
@@ -90,7 +91,8 @@ foreach ($dates as $date) {
         }
     }
 
-    $oldline = find_lines($linetype, [(object)['field' => 'id', 'value' => $line->id,]])[0];
+    $oldlines = find_lines($linetype, [(object)['field' => 'id', 'value' => $line->id,]]);
+    $oldline = @$oldlines[0] ?: (object) [];
     $reverse = $linetype->links_reversed;
 
     foreach ($linetype->links as $linkname) {

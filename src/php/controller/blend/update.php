@@ -10,8 +10,6 @@ $fields = $blend->fields;
 
 $data = json_decode(file_get_contents('php://input'));
 
-$line = (object) $_POST;
-
 apply_filters();
 
 $filters = get_current_filters($fields);
