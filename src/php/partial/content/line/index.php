@@ -49,6 +49,7 @@
             </div>
         </form>
     </div>
+    <div style="clear: both"></div>
     <?php
     if (isset($child_sets)) {
         $parentType = $linetype->name;
