@@ -181,17 +181,55 @@
             return;
         }
 
-        $.ajax('/api/blend/' + BLEND_NAME + '/update', {
-            method: 'post',
-            contentType: false,
-            processData: false,
-            data: JSON.stringify(data),
-            success: function(data) {
-                window.location.reload();
-            },
-            error: function(data){
-                alert(data.responseJSON && data.responseJSON.error || 'Unknown error');
+        var handleSave = function() {
+            $.ajax('/api/blend/' + BLEND_NAME + '/update', {
+                method: 'post',
+                contentType: false,
+                processData: false,
+                data: JSON.stringify(data),
+                success: function(data) {
+                    window.location.reload();
+                },
+                error: function(data){
+                    alert(data.responseJSON && data.responseJSON.error || 'Unknown error');
+                }
+            });
+        };
+
+        var $fileInputs = $editForm.find('input[type="file"]');
+        var numLoadedFiles = 0;
+
+        if (!$fileInputs.length) {
+            handleSave();
+        }
+
+        $fileInputs.each(function(){
+            var $input = $(this);
+            var file = $input[0].files[0];
+            delete data[$input.attr('name')];
+
+            if (!file) {
+                numLoadedFiles++;
+
+                if (numLoadedFiles == $fileInputs.length) {
+                    handleSave();
+                }
+
+                return;
             }
+
+            var reader = new FileReader();
+
+            reader.onload = function(event) {
+                data[$input.attr('name')] = btoa(event.target.result);
+                numLoadedFiles++;
+
+                if (numLoadedFiles == $fileInputs.length) {
+                    handleSave();
+                }
+            };
+
+            reader.readAsBinaryString(file);
         });
     });
 
@@ -208,15 +246,55 @@
             data[$(this).attr('name')] = $(this).val();
         });
 
-        $.ajax('/' + blend + '/' + linetype + '/add', {
-            method: 'post',
-            data: data,
-            success: function(data) {
-                window.location.reload();
-            },
-            error: function(data){
-                alert(data.responseJSON && data.responseJSON.error || 'Unknown error');
+        var handleSave = function() {
+            $.ajax('/' + blend + '/' + linetype + '/add', {
+                method: 'post',
+                contentType: false,
+                processData: false,
+                data: JSON.stringify(data),
+                success: function(data) {
+                    window.location.reload();
+                },
+                error: function(data){
+                    alert(data.responseJSON && data.responseJSON.error || 'Unknown error');
+                }
+            });
+        };
+
+        var $fileInputs = $addForm.find('input[type="file"]');
+        var numLoadedFiles = 0;
+
+        if (!$fileInputs.length) {
+            handleSave();
+        }
+
+        $fileInputs.each(function(){
+            var $input = $(this);
+            var file = $input[0].files[0];
+            delete data[$input.attr('name')];
+
+            if (!file) {
+                numLoadedFiles++;
+
+                if (numLoadedFiles == $fileInputs.length) {
+                    handleSave();
+                }
+
+                return;
             }
+
+            var reader = new FileReader();
+
+            reader.onload = function(event) {
+                data[$input.attr('name')] = btoa(event.target.result);
+                numLoadedFiles++;
+
+                if (numLoadedFiles == $fileInputs.length) {
+                    handleSave();
+                }
+            };
+
+            reader.readAsBinaryString(file);
         });
     });
 
