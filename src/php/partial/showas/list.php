@@ -112,6 +112,11 @@ $seen_today = !@$currentgroup || !$daterange || strcmp($currentgroup, $from) < 0
                                 ?><i class="icon icon--mono icon--<?= @$field->translate[$value] ?? $value ?>"></i><?php
                             } elseif ($field->type == 'color') {
                                 ?><span style="display: inline-block; height: 1em; width: 1em; background-color: #<?= $value ?>;">&nbsp;</span><?php
+                            } elseif ($field->type == 'file' && defined('FILES_HOME')) {
+                                $file = FILES_HOME . '/' . ($field->path)($record);
+                                if (file_exists($file)) {
+                                    ?><a href="/download/<?= ($field->path)($record) ?>" download><i class="icon icon--mono icon--<?= @$field->translate[$field->icon] ?? $field->icon ?>"></i></a><?php
+                                }
                             } else {
                                 echo is_callable(@$field->prefix) ? ($field->prefix)($record) : @$field->prefix;
                                 echo $field->type == 'fake' ? $field->value : (strlen($value) > MAX_COLUMN_WIDTH ? substr($value, 0, MAX_COLUMN_WIDTH - 1) . "&hellip;" : $value);

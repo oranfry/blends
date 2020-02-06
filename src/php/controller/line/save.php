@@ -91,6 +91,40 @@ foreach ($dates as $date) {
         }
     }
 
+    foreach ($linetype->fields as $field) {
+        if ($field->type == 'file' && @$line->{$field->name}) {
+            $filepath = FILES_HOME . '/' . ($field->path)($line);
+            $result = base64_decode($line->{$field->name});
+
+            if (@$field->mimetype) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                if ($finfo->buffer($result) !== $field->mimetype) {
+                    continue;
+                }
+            }
+
+            if ($result === false) {
+                continue;
+            }
+
+            $mkdirs = [];
+
+            for ($parent = dirname($filepath); !is_dir($parent); $parent = dirname($parent)) {
+                array_unshift($mkdirs, $parent);
+            }
+
+            foreach ($mkdirs as $dir) {
+                @mkdir($dir);
+            }
+
+            if (!is_dir(dirname($filepath))) {
+                continue;
+            }
+
+            file_put_contents($filepath, $result);
+        }
+    }
+
     $oldlines = find_lines($linetype, [(object)['field' => 'id', 'value' => $line->id,]]);
     $oldline = @$oldlines[0] ?: (object) [];
     $reverse = $linetype->links_reversed;

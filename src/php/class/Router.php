@@ -14,6 +14,7 @@ class Router
         '/([a-z]+)/([0-9]+)/delete' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/delete'],
         '/([a-z]+)/([0-9]+)/unlink' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/unlink'],
         '/([a-z]+)/([0-9]+)/print' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/print'],
+        '/download/(.*)' => ['FILE', 'PAGE' => 'download'],
     ];
 
     public static function match($path)
