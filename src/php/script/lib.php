@@ -74,7 +74,7 @@ function route()
         die();
     }
 
-    if (@$_SESSION["AUTH"] != Config::get()->password) {
+    if (@$_SESSION["AUTH"] != Config::get()->password && @getallheaders()['X-Auth'] != Config::get()->password) {
         header("Location: /");
 
         die();
