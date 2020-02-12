@@ -287,8 +287,12 @@ if ($datefieldwhichisgroupfield) {
 $prepop = [];
 
 foreach ($filters as $filter) {
-    if (property_exists($filter, 'value') && $filter->cmp == '=' && !is_array($filter->value)) {
-        $prepop[$filter->field] = $filter->value;
+    if (property_exists($filter, 'value') && !is_array($filter->value)) {
+        if ($filter->cmp == '=') {
+            $prepop[$filter->field] = $filter->value;
+        } elseif ($filter->cmp == 'like') {
+            $prepop[$filter->field] = str_replace('%', '', $filter->value);
+        }
     }
 }
 
