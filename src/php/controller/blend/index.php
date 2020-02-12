@@ -5,6 +5,10 @@ use contextvariableset\Filter;
 use contextvariableset\Hidden;
 use contextvariableset\Showas;
 
+if (defined('JSON') && JSON) {
+    define('LAYOUT', 'json');
+}
+
 $blend = Blend::load(BLEND_NAME);
 
 $linetypes = array_map(function ($linetype_name) {
@@ -297,6 +301,7 @@ foreach ($filters as $filter) {
 }
 
 return [
+    'data' => $records,
     'records' => $records,
     'classes' => $classes,
     'fields' => $fields,

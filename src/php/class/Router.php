@@ -3,6 +3,7 @@ class Router
 {
     private static $routes = [
         '/blend/([a-z]+)' => ['BLEND_NAME', 'PAGE' => 'blend/index'],
+        '/api/blend/([a-z]+)' => ['BLEND_NAME', 'PAGE' => 'blend/index', 'JSON' => true],
         '/api/blend/([a-z]+)/delete' => ['BLEND_NAME', 'PAGE' => 'blend/delete'],
         '/api/blend/([a-z]+)/update' => ['BLEND_NAME', 'PAGE' => 'blend/update'],
         '/api/blend/([a-z]+)/print' => ['BLEND_NAME', 'PAGE' => 'blend/print'],

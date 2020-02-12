@@ -24,6 +24,24 @@ abstract class ContextVariableSet
 
     protected function getRawData()
     {
+        foreach (getallheaders() as $hname => $hvalue) {
+            if ($hname == 'X-Cvs') {
+                $fromheaders = [];
+                $cvsheaders = explode(',', $hvalue);
+
+                foreach ($cvsheaders as $rawheader) {
+                    list($fname, $fvalue) = explode('=', $rawheader, 2);
+                    list($fmajor, $fminor) = explode('__', $fname, 2);
+
+                    if ($fmajor == $this->prefix) {
+                        $fromheaders[$fminor] = $fvalue;
+                    }
+                }
+
+                return $fromheaders;
+            }
+        }
+
         return @$_SESSION['contextvariables'][CONTEXT][$this->prefix] ?: [];
     }
 
