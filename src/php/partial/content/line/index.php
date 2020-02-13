@@ -49,7 +49,6 @@
             </div>
         </form>
     </div>
-    <div style="clear: both"></div>
     <?php
     if (isset($child_sets)) {
         $parentType = $linetype->name;
@@ -77,7 +76,9 @@
             require BLENDS_HOME . "/src/php/partial/showas/list.php";
         }
     }
-
+    ?>
+    <div style="clear: both"></div>
+    <?php
     if (method_exists($linetype, 'asText') && @$line) {
         ?><pre id="printpreview" class="printpreview"><?= $linetype->asText($line, $child_sets) ?><button class="print-line">Print</button></pre><br><?php
     }
