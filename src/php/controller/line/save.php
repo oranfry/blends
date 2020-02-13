@@ -61,7 +61,7 @@ foreach ($dates as $date) {
         $querydata = [];
 
         foreach ($needed_vars as $nv) {
-            $querydata[$nv] = $line->{$nv} ?: null;
+            $querydata[$nv] = @$line->{$nv} ?: null;
         }
 
         $fieldsClause = implode(', ', $fields);
@@ -77,8 +77,8 @@ foreach ($dates as $date) {
 
         $line->id = Db::pdo_insert_id();
 
-        if (@$_POST['parent']) {
-            if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $_POST['parent'], $groups)) {
+        if (@$line->parent) {
+            if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
                 error_response('Invalid parent specification');
             }
 
