@@ -129,15 +129,14 @@ foreach ($dates as $date) {
     $oldline = @$oldlines[0] ?: (object) [];
     $reverse = $linetype->links_reversed;
 
-    foreach ($linetype->links as $linkname) {
-        $side = 0;
+    $collected_inlinelinks = collect_inline_links(LINETYPE_NAME);
+    $ids = [LINETYPE_NAME => $line->id];
 
-        if (in_array($linkname, $reverse)) {
-            array_splice($reverse, array_search($linkname, $reverse), 1);
-            $side = 1;
-        }
+    foreach ($collected_inlinelinks as $link) {
+        $side = @$link->reverse ? 0 : 1;
+        $tablelink = Tablelink::load($link->tablelink);
+        $parenttype = $link->parenttype;
 
-        $tablelink = Tablelink::load($linkname);
         $assocname = $tablelink->ids[$side];
         $associd_field = "{$assocname}_id";
         $otherside = ($side + 1) % 2;
@@ -174,7 +173,7 @@ foreach ($dates as $date) {
             $fieldsClause = implode(', ', $fields);
             $valuesClause = implode(', ', $values);
 
-            $q = "insert into {$linetype_db_table} ({$fieldsClause}) values ({$valuesClause})";
+            $q = "insert into {$dbtable} ({$fieldsClause}) values ({$valuesClause})";
             $stmt = Db::prepare($q);
             $result = $stmt->execute($querydata);
 
@@ -185,15 +184,17 @@ foreach ($dates as $date) {
             $associd = Db::pdo_insert_id();
 
             Db::succeed(
-                "insert into {$tablelink->middle_table} ({$tablelink->ids[$otherside]}_id, {$tablelink->ids[$side]}_id) values ({$line->id}, {$associd})",
+                "insert into {$tablelink->middle_table} ({$tablelink->ids[$otherside]}_id, {$tablelink->ids[$side]}_id) values ({$ids[$parenttype]}, {$associd})",
                 "Problem creating assoc link"
             );
+
+            $ids[$link->linetype] = Db::pdo_insert_id();
         } elseif ($had && !$has) {
             $assoc_idfield = "{$assocname}_id";
             $assoc_id = @$oldline->{$assoc_idfield};
 
             Db::succeed(
-                "delete from {$tablelink->middle_table} where {$tablelink->ids[$otherside]}_id = {$line->id} and {$tablelink->ids[$side]}_id = {$assoc_id}",
+                "delete from {$tablelink->middle_table} where {$tablelink->ids[$otherside]}_id = {$ids[$parenttype]} and {$tablelink->ids[$side]}_id = {$assoc_id}",
                 "Problem deleting unneeded assoc link"
             );
 
