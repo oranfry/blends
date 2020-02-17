@@ -619,12 +619,12 @@ a.cv-manip, .open-custom-daterange {
 
 .printpreview {
     position: relative;
+    max-width: 42ch;
     text-align: left;
     border: 1px solid #333;
     margin: 0;
-    padding: 1em;
+    padding: 3em 1em;
     display: inline-block;
-    box-sizing: border-box;
 }
 
 .print-line {
