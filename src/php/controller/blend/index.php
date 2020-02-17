@@ -285,7 +285,7 @@ $datefieldwhichisgroupfield = @filter_objects(@filter_objects($all_fields, 'name
 
 if ($datefieldwhichisgroupfield) {
     $currentgroup = date('Y-m-d');
-    $defaultgroup = ContextVariableSet::get('daterange')->from;
+    $defaultgroup = date('Y-m-d');
 }
 
 $prepop = [];
