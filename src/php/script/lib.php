@@ -897,12 +897,24 @@ function generate_link_join_clause(
 
 function print_line($linetype, $line, $child_sets)
 {
-    if (!defined('PRINTER_FILE')) {
-        error_response('PRINTER_FILE not defined', 500);
+    if (!method_exists($linetype, 'astext')) {
+        return;
     }
+
+    if (!defined('PRINTER_FILE')) {
+        return; // lets not and say we did - for testing!
+    }
+
+    $logofile = @Config::get()->logofile;
 
     $printout = '';
     $printout .= ESC."@"; // Reset to defaults
+
+    if ($logofile && file_exists($logofile)) {
+        $printout .= file_get_contents($logofile);
+        $printout .= "\n\n";
+    }
+
     $printout .= $linetype->astext($line, $child_sets);
     $printout .= ESC."d".chr(4);
     $printout .= GS."V\x41".chr(3);

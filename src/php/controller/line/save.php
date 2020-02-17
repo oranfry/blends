@@ -256,6 +256,10 @@ foreach ($dates as $date) {
     }
 }
 
+if (@$linetype->printonsave) {
+    print_line($linetype, $line, load_children($linetype, $line));
+}
+
 return [
     'data' => $line,
 ];
