@@ -955,7 +955,7 @@ function print_line($linetype, $line, $child_sets)
         $printout .= "\n\n";
     }
 
-    $printout .= $linetype->astext($line, $child_sets);
+    $printout .= wordwrap($linetype->astext($line, $child_sets), 42, "\n", true);
     $printout .= ESC."d".chr(4);
     $printout .= GS."V\x41".chr(3);
 
