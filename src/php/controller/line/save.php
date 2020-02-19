@@ -77,18 +77,19 @@ foreach ($dates as $date) {
 
         $line->id = Db::pdo_insert_id();
 
-        if (@$line->parent) {
-            if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
-                error_response('Invalid parent specification');
-            }
+    }
 
-            $parentlink = Tablelink::load($groups[1]);
-            $parentside = @array_flip($parentlink->ids)[$groups[2]];
-            $childside = ($parentside + 1) % 2;
-            $parentid = intval($groups[3]);
-
-            Db::succeed("insert into {$parentlink->middle_table} ({$parentlink->ids[$parentside]}_id, {$parentlink->ids[$childside]}_id) values ({$parentid}, {$line->id})");
+    if (@$line->parent) {
+        if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
+            error_response('Invalid parent specification');
         }
+
+        $parentlink = Tablelink::load($groups[1]);
+        $parentside = @array_flip($parentlink->ids)[$groups[2]];
+        $childside = ($parentside + 1) % 2;
+        $parentid = intval($groups[3]);
+
+        Db::succeed("insert into {$parentlink->middle_table} ({$parentlink->ids[$parentside]}_id, {$parentlink->ids[$childside]}_id) values ({$parentid}, {$line->id}) on duplicate key update {$parentlink->ids[$parentside]}_id = {$parentid}, {$parentlink->ids[$childside]}_id = {$line->id}");
     }
 
     foreach ($linetype->fields as $field) {
