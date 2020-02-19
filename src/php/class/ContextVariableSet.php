@@ -34,7 +34,7 @@ abstract class ContextVariableSet
                     list($fmajor, $fminor) = explode('__', $fname, 2);
 
                     if ($fmajor == $this->prefix) {
-                        $fromheaders[$fminor] = $fvalue;
+                        $fromheaders[$fminor] = str_replace('|', ',', $fvalue);
                     }
                 }
 
