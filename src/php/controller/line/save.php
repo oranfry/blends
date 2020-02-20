@@ -168,7 +168,7 @@ foreach ($dates as $date) {
             $querydata = [];
 
             foreach ($needed_vars as $nv) {
-                $querydata[$nv] = $line->{$nv} ?: null;
+                $querydata[$nv] = @$line->{$nv} ?: null;
             }
 
             $fieldsClause = implode(', ', $fields);
