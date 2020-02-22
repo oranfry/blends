@@ -26,4 +26,14 @@ class Linetype extends Thing
     {
         return [];
     }
+
+    public function astext($line, $child_sets)
+    {
+        return null;
+    }
+
+    public function ashtml($line, $child_sets)
+    {
+        return null;
+    }
 }

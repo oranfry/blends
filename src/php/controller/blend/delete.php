@@ -1,6 +1,4 @@
 <?php
-define('LAYOUT', 'json');
-
 $blend = Blend::load(BLEND_NAME);
 $linetypes = array_map(function ($linetype_name) {
     return Linetype::load($linetype_name);

@@ -1,6 +1,4 @@
 <?php
-define('LAYOUT', 'json');
-
 $linetype = Linetype::load(LINETYPE_NAME);
 $line = find_lines($linetype, [(object)['field' => 'id', 'value' => LINE_ID]])[0];
 

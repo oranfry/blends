@@ -1,5 +1,4 @@
 <?php
-define('LAYOUT', 'json');
 
 $linetype = Linetype::load(LINETYPE_NAME);
 

@@ -1,8 +1,6 @@
 <?php
 use contextvariableset\Repeater;
 
-define('LAYOUT', 'json');
-
 $linetype = Linetype::load(LINETYPE_NAME);
 $linetype_db_table = Table::load($linetype->table)->table;
 $line_template =  json_decode(file_get_contents('php://input'));

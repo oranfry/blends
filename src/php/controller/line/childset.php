@@ -12,9 +12,10 @@ if (!$line) {
 
 $child_sets = load_children($linetype, $line);
 
-$line->type = $linetype->name;
-$line->astext = $linetype->astext($line, $child_sets);
+if (!isset($child_sets[CHILDSET])) {
+    error_response('No such childset', 400);
+}
 
 return [
-    'data' => $line,
+    'data' => $child_sets[CHILDSET],
 ];
