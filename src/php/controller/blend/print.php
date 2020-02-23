@@ -1,14 +1,10 @@
 <?php
 $blend = Blend::load(BLEND_NAME);
+$filters = get_query_filters();
 $linetypes = array_map(function ($linetype_name) {
     return Linetype::load($linetype_name);
 }, $blend->linetypes);
-
 $fields = $blend->fields;
-
-apply_filters();
-
-$filters = get_current_filters($fields);
 
 foreach ($linetypes as $linetype) {
     $_filters = filter_filters($filters, $linetype, $fields);

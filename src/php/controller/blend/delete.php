@@ -1,11 +1,9 @@
 <?php
 $blend = Blend::load(BLEND_NAME);
 $filters = get_query_filters();
-
 $linetypes = array_map(function ($linetype_name) {
     return Linetype::load($linetype_name);
 }, $blend->linetypes);
-
 $fields = $blend->fields;
 
 $numQueries = 0;

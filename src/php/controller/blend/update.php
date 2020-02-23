@@ -1,14 +1,11 @@
 <?php
 $blend = Blend::load(BLEND_NAME);
 $filters = get_query_filters();
-
+$data = json_decode(file_get_contents('php://input'));
 $linetypes = array_map(function ($linetype_name) {
     return Linetype::load($linetype_name);
 }, $blend->linetypes);
-
 $fields = $blend->fields;
-
-$data = json_decode(file_get_contents('php://input'));
 
 $invalids = [];
 $ids = [];
