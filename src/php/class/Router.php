@@ -19,9 +19,9 @@ class Router
         '/([a-z]+)/([0-9]+)/delete' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/delete'],
         '/([a-z]+)/([0-9]+)/child/([a-z]+)' => ['LINETYPE_NAME', 'LINE_ID', 'CHILDSET', 'PAGE' => 'line/childset'],
         '/([a-z]+)/([0-9]+)/print' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/print'],
+        '/([a-z]+)/([0-9]+)/unlink/([a-z]+)/([0-9]+)' => ['LINETYPE_NAME', 'LINE_ID', 'PARENTTYPE_NAME', 'PARENT_ID', 'PAGE' => 'line/unlink'],
 
         '/([a-z]+)/([0-9]+)/html' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/html'],
-        '/([a-z]+)/([0-9]+)/unlink' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/unlink'],
         '/download/(.*)' => ['FILE', 'PAGE' => 'download'],
     ];
 

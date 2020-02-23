@@ -1,17 +1,7 @@
 <?php
 
 $linetype = Linetype::load(LINETYPE_NAME);
-
-if (!isset($_GET['parentid']) || !isset($_GET['parenttype'])) {
-    error_response('Parent not specified');
-}
-
-if (!preg_match('/^[0-9]+$/', @$_GET['parentid']) || !preg_match('/^[a-z]+$/', @$_GET['parenttype'])) {
-    error_response('Invalid parent specifications');
-}
-
-$parentid = @$_GET['parentid'];
-$parentlinetype = Linetype::load($_GET['parenttype']);
+$parentlinetype = Linetype::load(PARENTTYPE_NAME);
 
 $tablelink = null;
 
@@ -23,4 +13,8 @@ foreach ($parentlinetype->children as $child) {
     }
 }
 
-unlink_record(LINE_ID, $parentid, $tablelink);
+if (!$tablelink) {
+    error_response('Could not find the table link');
+}
+
+unlink_record(LINE_ID, PARENT_ID, $tablelink);
