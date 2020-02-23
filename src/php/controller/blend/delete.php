@@ -24,24 +24,26 @@ foreach ($linetypes as $linetype) {
 
     list(, , $filterClauses) = lines_prepare_search($linetype, $_filters);
 
-    $allLinks = array_merge($linetype->links, map_objects($linetype->children, 'parent_link'));
+    $allLinks = array_merge(
+        $linetype->inlinelinks,
+        array_map(function($c){
+            return (object)['linetype' => $c->linetype, 'tablelink' => $c->parent_link];
+        }, $linetype->children)
+    );
 
     $joinClauses = [];
     $idfields = [];
 
-    $reverse = $linetype->links_reversed;
-
     foreach ($allLinks as $_link) {
         $side = 1;
 
-        if (in_array($_link, $reverse)) {
+        if (@$_link->reverse) {
             $side = 0;
-            array_splice($reverse, array_search($_link, $reverse), 1);
         }
 
         $otherside = ($side + 1) % 2;
 
-        $tablelink = Tablelink::load($_link);
+        $tablelink = Tablelink::load($_link->tablelink);
         $assocdbtable = Table::load($tablelink->tables[$side])->table;
 
         $joinClauses[] = "left join {$tablelink->middle_table} {$tablelink->ids[$side]}_m on {$tablelink->ids[$side]}_m.{$tablelink->ids[$otherside]}_id = t.id";
@@ -66,13 +68,12 @@ foreach ($linetypes as $linetype) {
         $reverse = @$linetype->links_reversed ?: [];
 
         foreach ($allLinks as $_link) {
-            $tablelink = Tablelink::load($_link);
+            $tablelink = Tablelink::load($_link->tablelink);
 
             $side = 0;
 
-            if (in_array($_link, $reverse)) {
+            if (@$_link->$reverse) {
                 $side = 1;
-                array_splice($reverse, array_search($_link, $reverse), 1);
             }
 
             $otherside = ($side + 1) % 2;
