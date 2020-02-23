@@ -10,4 +10,8 @@ $child_sets = load_children($linetype, $line);
 
 print_line($linetype, $line, $child_sets);
 
-@$messages[] = "Printed Happily";
+$messages = ["Printed Happily"];
+
+return [
+    'data' => $messages,
+];
