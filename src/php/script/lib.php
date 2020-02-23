@@ -1,10 +1,4 @@
 <?php
-use contextvariableset\Daterange;
-use contextvariableset\Hidden;
-use contextvariableset\Repeater;
-use contextvariableset\Value;
-use contextvariableset\Filter;
-
 define('REFCOL', 'd8b0b0');
 define('MAX_COLUMN_WIDTH', 25);
 
@@ -300,101 +294,6 @@ function get_adhoc_filters()
     return $filters;
 }
 
-function get_repeater_filters($repeater, $datefield_name)
-{
-    return [(object) [
-        'cmp' => 'custom',
-        'field' => $datefield_name,
-        'php' => function($value) use ($repeater) {
-            return false;
-        },
-        'sql' => function($field_name) use ($repeater) {
-            $period = $repeater->period;
-
-            if ($period == 'day') {
-                $n = $repeater->n;
-                $pegdate = $repeater->pegdate;
-                $fastforward = $repeater->ff;
-                $offset = '';
-            } elseif ($period == 'month') {
-                $day = $repeater->day;
-                $round = $repeater->round;
-                $fastforward = $repeater->ff;
-                $offset = $repeater->offset;
-            } elseif ($period == 'year') {
-                $month = $repeater->month;
-                $day = $repeater->day;
-                $round = $repeater->round;
-                $fastforward = $repeater->ff;
-                $offset = $repeater->offset;
-            } else {
-                error_response("Invalid period");
-            }
-
-            if ($offset) {
-                if (!preg_match('/^([+-][1-9][0-9]*) (day|month|year)$/', $offset, $groups)) {
-                    error_response('Invalid offset');
-                }
-
-                $offsetMagnitude = intval(preg_replace('/[+-]/', '', $groups[1]));
-                $offsetSign = preg_match('/-/', $groups[1]) ? '-' : '+';
-                $offsetPeriod = $groups[2];
-            }
-
-            if (!$offset || !$offsetMagnitude) {
-                $offsetR = '';
-            } elseif ($offsetSign == '-') {
-                $offsetR = "+ interval {$offsetMagnitude} {$offsetPeriod}";
-            } else {
-                $offsetR = "- interval {$offsetMagnitude} {$offsetPeriod}";
-            }
-
-            if ($offsetR) {
-                $field = "{$field_name} {$offsetR}";
-            } else {
-                $field = "{$field_name}";
-            }
-
-            $whereClauses = [];
-
-            if ($period == 'day') {
-                $expr = "(to_days({$field}) - to_days('{$pegdate}')) % {$n}";
-
-                if ($fastforward) {
-                    $whereClauses[] = "{$expr} < 7";
-                } else {
-                    $whereClauses[] = "{$expr} = 0";
-                }
-            } else {
-                if ($round) {
-                    $left = "least(day({$field}), day(last_day({$field})))";
-                    $right = "least({$day}, day(last_day({$field})))";
-                } else {
-                    $left = "day({$field})";
-                    $right = "{$day}";
-                }
-
-                if ($fastforward) {
-                    $whereClauses[] = "{$left} >= {$right} and {$left} < {$right} + 7";
-
-                } else {
-                    $whereClauses[] = "{$left} = {$right}";
-                }
-
-                if ($period == 'year') {
-                    $whereClauses[] = "month({$field}) = {$month}";
-                }
-            }
-
-            if ($fastforward) {
-                $whereClauses[] = "dayofweek({$field}) = {$fastforward}";
-            }
-
-            return implode(' and ', $whereClauses);
-        },
-    ]];
-}
-
 function filter_filters($filters, $linetype, $fields)
 {
     $r = [];
@@ -559,20 +458,13 @@ function lines_prepare_search(
             $expression = $field->fuse;
         }
 
-        if (is_array($filter->value)) {
-            if ($cmp != '=') {
-                error_response('Array filter values should be used with =', 500);
-            }
-
-            $cmp = 'in';
-            $value = "(" . implode(",", array_map(function ($v) {
-                return "'{$v}'";
-            }, $filter->value)) . ")";
+        if ($cmp == '*=') {
+            $repeater = Repeater::create($filter->value);
+            $filterClauses[] = $repeater->get_clause($expression);
         } else {
-            $value = "'{$filter->value}'";
+            $filterClauses[] = "{$expression} {$cmp} '{$filter->value}'";
         }
 
-        $filterClauses[] = "{$expression} {$cmp} {$value}";
     }
 
     $linetype_db_table = Table::load($linetype->table)->table;
@@ -1186,13 +1078,12 @@ function get_repeater_dates($linetype, $repeater)
     return $values;
 }
 
-
 function get_query_filters()
 {
     $filters = [];
 
     foreach (explode('&', $_SERVER['QUERY_STRING']) as $v) {
-        $r = preg_split('/(>=|<=|~|=|<|>)/', urldecode($v), -1, PREG_SPLIT_DELIM_CAPTURE);
+        $r = preg_split('/(\*=|>=|<=|~|=|<|>)/', urldecode($v), -1, PREG_SPLIT_DELIM_CAPTURE);
 
         if (count($r) == 3) {
             $filters[] = (object) [
