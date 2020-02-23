@@ -25,10 +25,10 @@ foreach ($linetypes as $linetype) {
     list(, , $filterClauses) = lines_prepare_search($linetype, $_filters);
 
     $allLinks = array_merge(
-        $linetype->inlinelinks,
+        $linetype->inlinelinks ?: [],
         array_map(function($c){
             return (object)['linetype' => $c->linetype, 'tablelink' => $c->parent_link];
-        }, $linetype->children)
+        }, $linetype->children ?: [])
     );
 
     $joinClauses = [];
