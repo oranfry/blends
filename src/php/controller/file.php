@@ -1,5 +1,4 @@
 <?php
-define('LAYOUT', 'download');
 
 if (preg_match('@/\.\.@', FILE) || preg_match('@^\.\.@', FILE)) {
     error_response('Bad file path');
@@ -15,7 +14,9 @@ $finfo = new finfo(FILEINFO_MIME_TYPE);
 $content_type = $finfo->file($file);
 
 return [
-    'filedata' => file_get_contents($file),
-    'content_type' => $content_type,
-    'filename' => basename(FILE),
+    'data' => [
+        'filedata' => base64_encode(file_get_contents($file)),
+        'content_type' => $content_type,
+        'filename' => basename(FILE),
+    ],
 ];

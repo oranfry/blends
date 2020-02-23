@@ -399,6 +399,17 @@ function find_lines(
         $line->parenttype = @$row['parenttype'];
         $line->parentid = @$row[$row['parenttype'] . '_id'];
 
+        foreach ($linetype->fields as $_field) {
+            if ($_field->type == 'file' && defined('FILES_HOME')) {
+                $path = ($_field->path)($line);
+                $file = FILES_HOME . '/' . $path;
+
+                if (file_exists($file)) {
+                    $line->{$_field->name} = $path;
+                }
+            }
+        }
+
         if ($parentId) {
             $line->parent = $parentId;
             $line->parent_link = $parentLink;
