@@ -5,6 +5,7 @@ class Router
         '/blend/([a-z]+)/info' => ['BLEND_NAME', 'PAGE' => 'blend/info'],
         '/blend/([a-z]+)/search' => ['BLEND_NAME', 'PAGE' => 'blend/index'],
         '/blend/([a-z]+)/summaries' => ['BLEND_NAME', 'PAGE' => 'blend/summaries'],
+        '/blend/([a-z]+)/delete' => ['BLEND_NAME', 'PAGE' => 'blend/delete'],
 
         '/([a-z]+)/info' => ['LINETYPE_NAME', 'PAGE' => 'line/info'],
         '/([a-z]+)/suggested' => ['LINETYPE_NAME', 'PAGE' => 'line/suggested'],
@@ -16,7 +17,6 @@ class Router
 
         '/tablelink/([a-z]+)/info' => ['TABLELINK_NAME', 'PAGE' => 'tablelink/info'],
 
-        '/api/blend/([a-z]+)/delete' => ['BLEND_NAME', 'PAGE' => 'blend/delete'],
         '/api/blend/([a-z]+)/update' => ['BLEND_NAME', 'PAGE' => 'blend/update'],
         '/api/blend/([a-z]+)/print' => ['BLEND_NAME', 'PAGE' => 'blend/print'],
 
