@@ -2,16 +2,14 @@
 class Router
 {
     private static $routes = [
-        '/([a-z]+)/info' => ['LINETYPE_NAME', 'PAGE' => 'line/info'],
         '/blend/([a-z]+)/info' => ['BLEND_NAME', 'PAGE' => 'blend/info'],
-        '/tablelink/([a-z]+)/info' => ['TABLELINK_NAME', 'PAGE' => 'tablelink/info'],
-
         '/blend/([a-z]+)/search' => ['BLEND_NAME', 'PAGE' => 'blend/index'],
         '/blend/([a-z]+)/summaries' => ['BLEND_NAME', 'PAGE' => 'blend/summaries'],
         '/blend/([a-z]+)/delete' => ['BLEND_NAME', 'PAGE' => 'blend/delete'],
         '/blend/([a-z]+)/update' => ['BLEND_NAME', 'PAGE' => 'blend/update'],
         '/blend/([a-z]+)/print' => ['BLEND_NAME', 'PAGE' => 'blend/print'],
 
+        '/([a-z]+)/info' => ['LINETYPE_NAME', 'PAGE' => 'line/info'],
         '/([a-z]+)/suggested' => ['LINETYPE_NAME', 'PAGE' => 'line/suggested'],
         '/([a-z]+)/([0-9]+)' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/index'],
         '/([a-z]+)/save' => ['LINETYPE_NAME', 'LINE_ID' => null, 'PAGE' => 'line/save'],
@@ -21,6 +19,8 @@ class Router
         '/([a-z]+)/([0-9]+)/print' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/print'],
         '/([a-z]+)/([0-9]+)/unlink/([a-z]+)/([0-9]+)' => ['LINETYPE_NAME', 'LINE_ID', 'PARENTTYPE_NAME', 'PARENT_ID', 'PAGE' => 'line/unlink'],
         '/([a-z]+)/([0-9]+)/html' => ['LINETYPE_NAME', 'LINE_ID', 'PAGE' => 'line/html'],
+
+        '/tablelink/([a-z]+)/info' => ['TABLELINK_NAME', 'PAGE' => 'tablelink/info'],
 
         '/file/(.*)' => ['FILE', 'PAGE' => 'file'],
     ];
