@@ -1,3 +1,4 @@
 <?php
-define('BLENDS_HOME', dirname(__DIR__));
-require BLENDS_HOME . '/src/php/script/framework.php';
+define('APP_HOME', dirname(__DIR__));
+define('AUTHSCHEME', 'header');
+require __DIR__ . '/../plugins/subsimple/subsimple.php';
