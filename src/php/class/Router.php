@@ -2,6 +2,7 @@
 class Router
 {
     private static $routes = [
+        '/blend/list' => ['BLEND_NAME', 'PAGE' => 'blend/list'],
         '/blend/([a-z]+)/info' => ['BLEND_NAME', 'PAGE' => 'blend/info'],
         '/blend/([a-z]+)/search' => ['BLEND_NAME', 'PAGE' => 'blend/index'],
         '/blend/([a-z]+)/summaries' => ['BLEND_NAME', 'PAGE' => 'blend/summaries'],
