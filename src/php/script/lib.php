@@ -63,19 +63,11 @@ function route()
     $path = strtok($_SERVER["REQUEST_URI"], '?');
 
     if (preg_match(',^/$,', $path, $groups)) {
-        require BLENDS_HOME . '/src/php/script/login.php';
-
         die();
     }
 
     if (@$_SESSION["AUTH"] != Config::get()->password && @getallheaders()['X-Auth'] != Config::get()->password) {
         header("Location: /");
-
-        die();
-    }
-
-    if (preg_match(',^/change-(instances|context)$,', $path, $groups)) {
-        require BLENDS_HOME . "/src/php/script/change-{$groups[1]}.php";
 
         die();
     }
