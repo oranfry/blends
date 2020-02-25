@@ -583,21 +583,24 @@ function get_values($table, $field)
     return $values;
 }
 
-function get_query_filters()
+function get_file_info($name)
 {
-    $filters = [];
-
-    foreach (explode('&', $_SERVER['QUERY_STRING']) as $v) {
-        $r = preg_split('/(\*=|>=|<=|~|=|<|>)/', urldecode($v), -1, PREG_SPLIT_DELIM_CAPTURE);
-
-        if (count($r) == 3) {
-            $filters[] = (object) [
-                'field' => $r[0],
-                'cmp' => $r[1],
-                'value' => $r[2],
-            ];
-        }
+    if (preg_match('@/\.\.@', $name) || preg_match('@^\.\.@', $name)) {
+        error_response('Bad file path');
     }
 
-    return $filters;
+    $file = FILES_HOME . '/' . $name;
+
+    if (!file_exists($file)) {
+        error_response('No such file');
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $content_type = $finfo->file($file);
+
+    return [
+        'filedata' => base64_encode(file_get_contents($file)),
+        'content_type' => $content_type,
+        'filename' => basename($name),
+    ];
 }
