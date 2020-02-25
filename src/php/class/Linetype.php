@@ -38,14 +38,14 @@ class Linetype extends Thing
     }
 
 
-    public static function childset($name)
+    public static function childset($name, $id, $childsetname)
     {
         $linetype = Linetype::load($name);
         $parenttype = null;
         $parentlink = null;
         $parentid = null;
 
-        $line = @find_lines($linetype, [(object)['field' => 'id', 'value' => LINE_ID]])[0];
+        $line = @find_lines($linetype, [(object)['field' => 'id', 'value' => $id]])[0];
 
         if (!$line) {
             error_response('No such line', 400);
@@ -53,11 +53,11 @@ class Linetype extends Thing
 
         $child_sets = load_children($linetype, $line);
 
-        if (!isset($child_sets[CHILDSET])) {
+        if (!isset($child_sets[$childsetname])) {
             error_response('No such childset', 400);
         }
 
-        return $child_sets[CHILDSET];
+        return $child_sets[$childsetname];
     }
 
     public static function delete($name, $id)
