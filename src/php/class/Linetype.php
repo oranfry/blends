@@ -286,7 +286,7 @@ class Linetype extends Thing
             $tablelink = Tablelink::load($link->tablelink);
             $parenttype = $link->parenttype;
 
-            $assocname = $tablelink->ids[$side];
+            $assocname = $link->alias;
             $associd_field = "{$assocname}_id";
             $otherside = ($side + 1) % 2;
             $dbtable = Table::load($tablelink->tables[$side])->table;

@@ -36,9 +36,9 @@ class Blend extends Thing
             list(, , $filterClauses) = lines_prepare_search($linetype, $_filters);
 
             $allLinks = array_merge(
-                $linetype->inlinelinks ?: [],
+                collect_inline_links($linetype->name),
                 array_map(function($c){
-                    return (object)['linetype' => $c->linetype, 'tablelink' => $c->parent_link];
+                    return (object)['linetype' => $c->linetype, 'tablelink' => $c->parent_link, 'alias' => $c->label];
                 }, $linetype->children ?: [])
             );
 
@@ -56,11 +56,12 @@ class Blend extends Thing
 
                 $tablelink = Tablelink::load($_link->tablelink);
                 $assocdbtable = Table::load($tablelink->tables[$side])->table;
+                $alias = @$_link->alias ?: $tablelink->ids[$side];
 
-                $joinClauses[] = "left join {$tablelink->middle_table} {$tablelink->ids[$side]}_m on {$tablelink->ids[$side]}_m.{$tablelink->ids[$otherside]}_id = t.id";
-                $joinClauses[] = "left join {$assocdbtable} {$tablelink->ids[$side]} on {$tablelink->ids[$side]}.id = {$tablelink->ids[$side]}_m.{$tablelink->ids[$side]}_id";
-                $idfields[] = "{$tablelink->ids[$side]}_m.{$tablelink->ids[0]}_id {$tablelink->ids[0]}_id";
-                $idfields[] = "{$tablelink->ids[$side]}_m.{$tablelink->ids[1]}_id {$tablelink->ids[1]}_id";
+                $joinClauses[] = "left join {$tablelink->middle_table} {$alias}_m on {$alias}_m.{$tablelink->ids[$otherside]}_id = t.id";
+                $joinClauses[] = "left join {$assocdbtable} {$alias} on {$alias}.id = {$alias}_m.{$tablelink->ids[$side]}_id";
+                $idfields[] = "{$alias}_m.{$tablelink->ids[0]}_id {$tablelink->ids[0]}_id";
+                $idfields[] = "{$alias}_m.{$tablelink->ids[1]}_id {$tablelink->ids[1]}_id";
             }
 
             $selectClause = implode(', ', array_merge(['t.id id'], $idfields));
@@ -122,7 +123,8 @@ class Blend extends Thing
 
             $q = "delete from {$dbtable} where {$linkDeleteClause}";
 
-            $result = Db::succeed($q);
+            // $result = Db::succeed($q);
+            error_log($q);
 
             $affectedLinks += Db::affected();
             $numQueries++;
@@ -133,7 +135,8 @@ class Blend extends Thing
 
             $q = "delete from {$dbtable} where id in ($recordDeleteClause)";
 
-            $result = Db::succeed($q);
+            // $result = Db::succeed($q);
+            error_log($q);
 
             $affectedRecords += Db::affected();
             $numQueries++;

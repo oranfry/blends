@@ -230,7 +230,7 @@ function lines_prepare_search(
     return [$joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, $joinTables, $idClauses, $parentTypeSelectors,];
 }
 
-function get_inline_joins($links, $basealias = 't')
+function get_inline_joins($links, $basealias = null)
 {
     $joins = [];
 
@@ -240,21 +240,27 @@ function get_inline_joins($links, $basealias = 't')
         $side = @$link->reverse ? 0 : 1;
         $leftJoin = @$link->required ? false : true;
 
-        $joins[] = generate_link_join_clause($tablelink, $tablelink->ids[$side], $basealias, $side, $leftJoin);
-        $joins = array_merge($joins, get_inline_joins(@$childlinetype->inlinelinks ?? [], $tablelink->ids[$side]));
+        $alias = ($basealias ? $basealias . '_' : '') . (@$link->alias ?? $tablelink->ids[$side]);
+        $joins[] = generate_link_join_clause($tablelink, $alias, ($basealias ?? 't'), $side, $leftJoin);
+        $joins = array_merge($joins, get_inline_joins(@$childlinetype->inlinelinks ?? [], $alias));
     }
 
     return $joins;
 }
 
-function collect_inline_links($linetype)
+function collect_inline_links($linetype, $basealias = null)
 {
     $links = [];
 
-    foreach (@Linetype::load($linetype)->inlinelinks ?: [] as $link) {
+    foreach (@Linetype::load($linetype)->inlinelinks ?: [] as $_link) {
+        $link = clone $_link;
         $link->parenttype = $linetype;
+        $side = @$link->reverse ? 0 : 1;
+        $tablelink = Tablelink::load($link->tablelink);
+        $alias = ($basealias ? $basealias . '_' : '') . (@$link->alias ?? $tablelink->ids[$side]);
+        $link->alias = $alias;
         $links[] = $link;
-        $links = array_merge($links, collect_inline_links($link->linetype));
+        $links = array_merge($links, collect_inline_links($link->linetype, $alias));
     }
 
     return $links;
