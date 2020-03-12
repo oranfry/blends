@@ -49,14 +49,11 @@ function ff($date, $day = 'Mon')
 function find_lines(
     $linetype,
     $filters = null,
-    $parentIdField = null,
     $parentId = null,
     $parentLink = null,
     $customClause = null
 ) {
-    $idField = @$linetype->id_field ?: 'id';
-
-    list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, , $idClauses, $parentTypeSelectors) = lines_prepare_search($linetype, $filters, $parentIdField, $parentId, $parentLink);
+    list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, , $idClauses, $parentTypeSelectors) = lines_prepare_search($linetype, $filters, $parentId, $parentLink);
 
     $whereClauses = array_merge(
         $linetype->clause ? ["({$linetype->clause})"] : [],
@@ -129,13 +126,11 @@ function find_lines(
 function lines_prepare_search(
     $linetype,
     $filters = null,
-    $parentIdField = null,
     $parentId = null,
     $parentLink = null,
     $customClause = null
 ) {
     $filters = $filters ?? [];
-    $idField = @$linetype->id_field ?: 'id';
     $reverse = $linetype->links_reversed;
 
     $parentLinks = [];
@@ -149,7 +144,7 @@ function lines_prepare_search(
         $parentTypeSelectors[] = "if({$parentlink->ids[0]}.id, '{$parentlink->name}', '')";
     }
 
-    $orderbys = ["t.{$idField}"];
+    $orderbys = ["t.id"];
     $filterClauses = [];
 
     foreach ($filters as $filter) {
@@ -211,7 +206,7 @@ function lines_prepare_search(
         $joinTables[] = $_joinTable;
 
         if ($parentId && $parentLink == $_link) {
-            $parentClauses[] = "{$tablelink->ids[$side]}.{$parentIdField} = '{$parentId}'";
+            $parentClauses[] = "{$tablelink->ids[$side]}.id = '{$parentId}'";
         }
     }
 
@@ -269,14 +264,11 @@ function collect_inline_links($linetype, $basealias = null)
 function summarise_lines(
     $linetype,
     $filters = [],
-    $parentIdField = null,
     $parentId = null,
     $parentLink = null,
     $customClause = null
 ) {
-    $idField = @$linetype->id_field ?: 'id';
-
-    list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses) = lines_prepare_search($linetype, $filters, $parentIdField, $parentId, $parentLink);
+    list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses) = lines_prepare_search($linetype, $filters, $parentId, $parentLink);
 
     $whereClauses = array_merge(
         $linetype->clause ? ["({$linetype->clause})"] : [],
@@ -332,14 +324,13 @@ function load_children($linetype, $parent)
 
 function load_childset($linetype, $parent, $descriptor)
 {
-    $idField = @$linetype->id_field ?: 'id';
-    $id = $parent->{$idField};
+    $id = $parent->id;
 
     $child_linetype = Linetype::load(@$descriptor->linetype);
     $fields = $child_linetype->fields;
 
     $childset = (object) [];
-    $childset->lines = find_lines($child_linetype, null, $idField, $id, $descriptor->parent_link);
+    $childset->lines = find_lines($child_linetype, null, $id, $descriptor->parent_link);
 
     $summary = (object) [];
     $hasSummaries = array_reduce($fields, function ($c, $v) {
