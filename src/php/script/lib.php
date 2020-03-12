@@ -53,7 +53,7 @@ function find_lines(
     $parentLink = null,
     $customClause = null
 ) {
-    list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, , $idClauses, $parentTypeSelectors) = lines_prepare_search($linetype, $filters, $parentId, $parentLink);
+    list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, , $idClauses) = lines_prepare_search($linetype, $filters, $parentId, $parentLink);
 
     $whereClauses = array_merge(
         $linetype->clause ? ["({$linetype->clause})"] : [],
@@ -73,8 +73,7 @@ function find_lines(
             array_filter($linetype->fields, function($v){
                 return $v->type != 'file';
             })
-        ),
-        $parentTypeSelectors ? ['concat(' . implode(', ', $parentTypeSelectors) . ') parenttype'] : []
+        )
     );
 
     $joinClause = implode(' ', $joinClauses);
@@ -133,13 +132,10 @@ function lines_prepare_search(
     $filters = $filters ?? [];
 
     $parentLinks = [];
-    $parentTypeSelectors = [];
     $parentLinetypes = find_parent_linetypes($linetype->name, $children);
 
     foreach ($parentLinetypes as $i => $parentLinetype) {
         $parentLinks[] = $children[$i]->parent_link;
-        $parentlink = Tablelink::load($children[$i]->parent_link);
-        $parentTypeSelectors[] = "if({$parentlink->ids[0]}.id, '{$parentlink->name}', '')";
     }
 
     $orderbys = ["t.id"];
@@ -211,7 +207,7 @@ function lines_prepare_search(
 
     $linetypeClauses = $linetype->clause ? ["({$linetype->clause})"] : [];
 
-    return [$joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, $joinTables, $idClauses, $parentTypeSelectors,];
+    return [$joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, $joinTables, $idClauses];
 }
 
 function get_inline_joins($links, $basealias = null)
