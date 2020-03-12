@@ -131,7 +131,6 @@ function lines_prepare_search(
     $customClause = null
 ) {
     $filters = $filters ?? [];
-    $reverse = $linetype->links_reversed;
 
     $parentLinks = [];
     $parentTypeSelectors = [];
@@ -139,7 +138,6 @@ function lines_prepare_search(
 
     foreach ($parentLinetypes as $i => $parentLinetype) {
         $parentLinks[] = $children[$i]->parent_link;
-        $reverse[] = $children[$i]->parent_link;
         $parentlink = Tablelink::load($children[$i]->parent_link);
         $parentTypeSelectors[] = "if({$parentlink->ids[0]}.id, '{$parentlink->name}', '')";
     }
@@ -185,28 +183,19 @@ function lines_prepare_search(
     $joinTables = ["{$linetype_db_table} t"];
     $parentClauses = [];
 
-    $_tablelinks = array_merge(@$linetype->links ?: [], $parentLinks);
-
-    for ($i = count($_tablelinks) - 1; $i >= 0; $i--) {
-        $_link = $_tablelinks[$i];
+    for ($i = count($parentLinks) - 1; $i >= 0; $i--) {
+        $_link = $parentLinks[$i];
 
         $tablelink = Tablelink::load($_link);
-        $leftJoin = !property_exists($linetype, 'links_required') || !in_array($_link, $linetype->links_required);
-        $side = 1;
 
-        if (in_array($_link, $reverse)) {
-            $side = 0;
-            array_splice($reverse, array_search($_link, $reverse), 1);
-        }
-
-        list($_joinClause, $_fields, $_groupbys, $_joinTable, $_idClause) = generate_link_join_clause($tablelink, $tablelink->ids[$side], 't', $side, $leftJoin);
+        list($_joinClause, $_fields, $_groupbys, $_joinTable, $_idClause) = generate_link_join_clause($tablelink, $tablelink->ids[0], 't', 0, true);
 
         $joinClauses[] = $_joinClause;
         $idClauses[] = $_idClause;
         $joinTables[] = $_joinTable;
 
         if ($parentId && $parentLink == $_link) {
-            $parentClauses[] = "{$tablelink->ids[$side]}.id = '{$parentId}'";
+            $parentClauses[] = "{$tablelink->ids[0]}.id = '{$parentId}'";
         }
     }
 
@@ -522,9 +511,9 @@ function get_all_tablelinks()
             $seen[$_linetype_name] = true;
             $_linetype = Linetype::load($_linetype_name);
 
-            foreach ($_linetype->links as $_link) {
-                if (!in_array($_link, $tablelinks)) {
-                    $tablelinks[] = $_link;
+            foreach ($_linetype->inlinelinks as $_link) {
+                if (!in_array($_link->tablelink, $tablelinks)) {
+                    $tablelinks[] = $_link->tablelink;
                 }
             }
 
