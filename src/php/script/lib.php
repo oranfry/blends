@@ -130,14 +130,6 @@ function lines_prepare_search(
     $customClause = null
 ) {
     $filters = $filters ?? [];
-
-    $parentLinks = [];
-    $parentLinetypes = find_parent_linetypes($linetype->name, $children);
-
-    foreach ($parentLinetypes as $i => $parentLinetype) {
-        $parentLinks[] = $children[$i]->parent_link;
-    }
-
     $orderbys = ["t.id"];
     $filterClauses = [];
 
@@ -179,20 +171,15 @@ function lines_prepare_search(
     $joinTables = ["{$linetype_db_table} t"];
     $parentClauses = [];
 
-    for ($i = count($parentLinks) - 1; $i >= 0; $i--) {
-        $_link = $parentLinks[$i];
-
-        $tablelink = Tablelink::load($_link);
+    if ($parentLink && $parentId) {
+        $tablelink = Tablelink::load($parentLink);
 
         list($_joinClause, $_fields, $_groupbys, $_joinTable, $_idClause) = generate_link_join_clause($tablelink, $tablelink->ids[0], 't', 0, true);
 
         $joinClauses[] = $_joinClause;
         $idClauses[] = $_idClause;
         $joinTables[] = $_joinTable;
-
-        if ($parentId && $parentLink == $_link) {
-            $parentClauses[] = "{$tablelink->ids[0]}.id = '{$parentId}'";
-        }
+        $parentClauses[] = "{$tablelink->ids[0]}.id = '{$parentId}'";
     }
 
     $inlinejoins = get_inline_joins(@$linetype->inlinelinks ?? []);
