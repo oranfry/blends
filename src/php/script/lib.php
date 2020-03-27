@@ -109,6 +109,10 @@ function find_lines(
                     $line->{$_field->name} = $path;
                 }
             }
+
+            if (property_exists($_field, 'calc')) {
+                $line->{$_field->name} = ($_field->calc)($line);
+            }
         }
 
         if ($parentId) {
