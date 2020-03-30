@@ -123,8 +123,7 @@ class Blend extends Thing
 
             $q = "delete from {$dbtable} where {$linkDeleteClause}";
 
-            // $result = Db::succeed($q);
-            error_log($q);
+            $result = Db::succeed($q);
 
             $affectedLinks += Db::affected();
             $numQueries++;
@@ -135,8 +134,7 @@ class Blend extends Thing
 
             $q = "delete from {$dbtable} where id in ($recordDeleteClause)";
 
-            // $result = Db::succeed($q);
-            error_log($q);
+            $result = Db::succeed($q);
 
             $affectedRecords += Db::affected();
             $numQueries++;
