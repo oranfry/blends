@@ -346,15 +346,18 @@ function generate_link_join_clause(
     $jointable = Table::load($tablelink->tables[$otherside]);
     $join_db_table = $jointable->table;
 
+    $my_id = ($tablelink->ids[$myside] ? $tablelink->ids[$myside] . '_' : '') . 'id';
+    $other_id = ($tablelink->ids[$otherside] ? $tablelink->ids[$otherside] . '_' : '') . 'id';
+
     $q =
         "$join
             {$tablelink->middle_table} {$alias}_m
         on
-            {$alias}_m.{$tablelink->ids[$myside]}_id = {$base_alias}.id
+            {$alias}_m.{$my_id} = {$base_alias}.id
         left join
             {$join_db_table} {$alias}
         on
-            {$alias}.id = {$alias}_m.{$tablelink->ids[$otherside]}_id
+            {$alias}.id = {$alias}_m.{$other_id}
         ";
     $prefix = $tablelink->ids[$otherside];
 
