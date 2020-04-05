@@ -166,7 +166,7 @@ function lines_prepare_search(
             $value =  '(' . implode(',', array_map(function($e){ return "'{$e}'"; }, $filter->value)) . ')';
             $filterClauses[] = "{$expression} in {$value}";
         } else {
-            $filterClauses[] = "{$expression} {$cmp} {$filter->value}";
+            $filterClauses[] = "{$expression} {$cmp} '{$filter->value}'";
         }
     }
 
