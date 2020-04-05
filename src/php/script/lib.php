@@ -162,10 +162,12 @@ function lines_prepare_search(
         if ($cmp == '*=') {
             $repeater = Repeater::create($filter->value);
             $filterClauses[] = $repeater->get_clause($expression);
+        } elseif (is_array($filter->value) && $cmp == '=') {
+            $value =  '(' . implode(',', array_map(function($e){ return "'{$e}'"; }, $filter->value)) . ')';
+            $filterClauses[] = "{$expression} in {$value}";
         } else {
-            $filterClauses[] = "{$expression} {$cmp} '{$filter->value}'";
+            $filterClauses[] = "{$expression} {$cmp} {$filter->value}";
         }
-
     }
 
     $linetype_db_table = Table::load($linetype->table)->table;
