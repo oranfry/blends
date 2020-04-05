@@ -215,7 +215,10 @@ function get_inline_joins($links, $basealias = null)
 
         $alias = ($basealias ? $basealias . '_' : '') . (@$link->alias ?? $tablelink->ids[$side]);
         $joins[] = generate_link_join_clause($tablelink, $alias, ($basealias ?? 't'), $side, $leftJoin);
-        $joins = array_merge($joins, get_inline_joins(@$childlinetype->inlinelinks ?? [], $alias));
+
+        if (!@$link->norecurse) {
+            $joins = array_merge($joins, get_inline_joins(@$childlinetype->inlinelinks ?? [], $alias));
+        }
     }
 
     return $joins;
@@ -233,7 +236,10 @@ function collect_inline_links($linetype, $basealias = null)
         $alias = ($basealias ? $basealias . '_' : '') . (@$link->alias ?? $tablelink->ids[$side]);
         $link->alias = $alias;
         $links[] = $link;
-        $links = array_merge($links, collect_inline_links($link->linetype, $alias));
+
+        if (!@$_link->norecurse) {
+            $links = array_merge($links, collect_inline_links($link->linetype, $alias));
+        }
     }
 
     return $links;
