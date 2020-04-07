@@ -282,6 +282,10 @@ class Linetype extends Thing
         $ids = [$name => $line->id];
 
         foreach ($collected_inlinelinks as $link) {
+            if ($link->norecurse) {
+                continue;
+            }
+
             $side = @$link->reverse ? 0 : 1;
             $tablelink = Tablelink::load($link->tablelink);
             $parenttype = $link->parenttype;
