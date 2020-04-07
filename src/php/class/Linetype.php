@@ -282,7 +282,7 @@ class Linetype extends Thing
         $ids = [$name => $line->id];
 
         foreach ($collected_inlinelinks as $link) {
-            if ($link->norecurse) {
+            if (@$link->norecurse) {
                 continue;
             }
 
