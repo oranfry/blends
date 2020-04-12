@@ -625,3 +625,32 @@ function get_file_info($name)
         'filename' => basename($name),
     ];
 }
+
+function init_blends()
+{
+    blends_load_packages();
+}
+
+function blends_load_packages()
+{
+    foreach (@Config::get()->packages ?: [] as $name => $config) {
+        $plugin_name = $config->name;
+        $package_file = null;
+
+        with_plugins(function($dir, $name) use ($plugin_name, &$package_file) {
+            if ($name == $plugin_name) {
+                $package_file = $dir . '/blends-package.php';
+            }
+        });
+
+        if (!file_exists($package_file)) {
+            error_response("Package descriptor file not found: " . $package_file, 500);
+        }
+
+        $package_config = require $package_file;
+
+        foreach (@$package_config->blends ?: [] as $blend) {
+            Config::get()->blends[] = $blend;
+        }
+    }
+}
