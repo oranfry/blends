@@ -426,7 +426,10 @@ function print_line($linetype, $line, $child_sets)
         return;
     }
 
+    $contents = $linetype->astext($line, $child_sets);
+
     if (!defined('PRINTER_FILE')) {
+        error_log("\n" . $contents);
         return; // lets not and say we did - for testing!
     }
 
@@ -440,7 +443,7 @@ function print_line($linetype, $line, $child_sets)
         $printout .= "\n\n";
     }
 
-    $printout .= wordwrap($linetype->astext($line, $child_sets), 42, "\n", true);
+    $printout .= wordwrap($contents, 42, "\n", true);
     $printout .= ESC."d".chr(4);
     $printout .= GS."V\x41".chr(3);
 
