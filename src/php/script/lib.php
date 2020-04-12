@@ -10,16 +10,50 @@ function filter_filters($filters, $linetype, $fields)
     $r = [];
 
     foreach ($filters as $filter) {
+        $filter = clone $filter;
+
+        if ($filter->field == 'deepid') {
+            $filter->field = 'id';
+            $ids = [];
+
+            foreach ((is_array($filter->value) ? $filter->value : [$filter->value]) as $deepid) {
+                $parts = explode(':', $deepid);
+                $type = $parts[0];
+                $id = $parts[1];
+
+                if ($type == $linetype->name) {
+                    $ids[] = $id;
+                }
+            }
+
+            if (!count($ids)) {
+                return false;
+            }
+
+            $filter->value = $ids;
+        }
+
+        if ($filter->field == 'id') {
+            $r[] = $filter;
+            continue;
+        }
+
         $linetype_field = @array_values(array_filter($linetype->fields, function ($v) use ($filter) {
-            return $v->name == $filter->field;
-        }))[0];
-        $field = @array_values(array_filter($fields, function ($v) use ($filter) {
             return $v->name == $filter->field;
         }))[0];
 
         if ($linetype_field) {
             $r[] = $filter;
-        } elseif (
+            continue;
+        }
+
+        // can't find the field, apply default
+
+        $field = @array_values(array_filter($fields, function ($v) use ($filter) {
+            return $v->name == $filter->field;
+        }))[0];
+
+        if (
             $filter->cmp == '=' && (
                 is_array($filter->value) && !in_array($field->default, $filter->value)
                 ||
