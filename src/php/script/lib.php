@@ -643,6 +643,10 @@ function blends_load_packages()
             }
         });
 
+        if (!$package_file) {
+            error_response("No such package: " . $plugin_name, 500);
+        }
+
         if (!file_exists($package_file)) {
             error_response("Package descriptor file not found: " . $package_file, 500);
         }
