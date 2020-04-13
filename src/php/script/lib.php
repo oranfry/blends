@@ -634,26 +634,11 @@ function init_blends()
 function blends_load_packages()
 {
     foreach (@Config::get()->packages ?: [] as $name => $config) {
-        $plugin_name = $config->name;
-        $package_file = null;
+        $package_name = $config->name;
 
-        with_plugins(function($dir, $name) use ($plugin_name, &$package_file) {
-            if ($name == $plugin_name) {
-                $package_file = $dir . '/blends-package.php';
-            }
-        });
+        $package = Package::load($package_name);
 
-        if (!$package_file) {
-            error_response("No such package: " . $plugin_name, 500);
-        }
-
-        if (!file_exists($package_file)) {
-            error_response("Package descriptor file not found: " . $package_file, 500);
-        }
-
-        $package_config = require $package_file;
-
-        foreach (@$package_config->blends ?: [] as $blend) {
+        foreach (@$package->blends ?: [] as $blend) {
             Config::get()->blends[] = $blend;
         }
     }
