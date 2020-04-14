@@ -633,10 +633,19 @@ function init_blends()
 
 function blends_load_packages()
 {
-    foreach (@Config::get()->packages ?: [] as $name => $config) {
+    foreach (@Config::get()->packages ?: [] as $alias => $config) {
         $package_name = $config->name;
+        $package = Package::create($package_name);
 
-        $package = Package::load($package_name);
+        if (@$config->label) {
+            $package->label = $config->label;
+        }
+
+        if (@$config->config) {
+            $package->config = $config->config;
+        }
+
+        Package::rput($alias, $package);
 
         foreach (@$package->blends ?: [] as $blend) {
             Config::get()->blends[] = $blend;
