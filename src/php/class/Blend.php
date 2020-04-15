@@ -66,7 +66,7 @@ class Blend extends Thing
 
             $selectClause = implode(', ', array_merge(['t.id id'], $idfields));
             $joinClause = implode(' ', $joinClauses);
-            $whereClause = implode(' and ', array_merge($filterClauses, $linetype->clause ? ["({$linetype->clause})"] : [])) ?: '1';
+            $whereClause = implode(' and ', array_merge($filterClauses, array_map(function($c){ return "({$c})"; }, @$linetype->clauses ?? []))) ?: '1';
 
             $q = "select {$selectClause} from {$linetype_db_table} t {$joinClause} where {$whereClause}";
 

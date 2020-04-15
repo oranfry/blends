@@ -90,7 +90,7 @@ function find_lines(
     list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, , $idClauses) = lines_prepare_search($linetype, $filters, $parentId, $parentLink);
 
     $whereClauses = array_merge(
-        $linetype->clause ? ["({$linetype->clause})"] : [],
+        array_map(function($c){ return "({$c})"; }, @$linetype->clauses ?? []),
         $filterClauses,
         $parentClauses,
         $customClause ? [$customClause] : [],
@@ -232,7 +232,7 @@ function lines_prepare_search(
         $joinTables[] = $_joinTable;
     }
 
-    $linetypeClauses = $linetype->clause ? ["({$linetype->clause})"] : [];
+    $linetypeClauses = array_map(function($c){ return "({$c})"; }, @$linetype->clauses ?? []);
 
     return [$joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, $joinTables, $idClauses];
 }
@@ -289,7 +289,7 @@ function summarise_lines(
     list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses) = lines_prepare_search($linetype, $filters, $parentId, $parentLink);
 
     $whereClauses = array_merge(
-        $linetype->clause ? ["({$linetype->clause})"] : [],
+        array_map(function($c){ return "({$c})"; }, @$linetype->clauses ?? []),
         $filterClauses,
         $parentClauses,
         $customClause ? [$customClause] : [],
@@ -589,13 +589,15 @@ function find_parent_linetypes($linetype_name, &$child_descriptors)
     return $parents;
 }
 
-function get_values($table, $field)
+function get_values($table, $field, $clause = null)
 {
     $values = [];
 
     $db_table = Table::load($table)->table;
 
-    $r = Db::succeed("select `{$field}` from `{$db_table}` t where `{$field}` is not null and `{$field}` != '' group by `{$field}` order by `{$field}`");
+    $and = $clause ? "and {$clause}" : '';
+
+    $r = Db::succeed("select `{$field}` from `{$db_table}` t where `{$field}` is not null and `{$field}` != '' {$and} group by `{$field}` order by `{$field}`");
 
     while ($value = mysqli_fetch_row($r)) {
         $values[] = $value[0];
@@ -633,20 +635,23 @@ function init_blends()
 
 function blends_load_packages()
 {
-    foreach (@Config::get()->packages ?: [] as $key => $config) {
+    foreach (@Config::get()->packages ?: [] as $config) {
         $package_name = $config->name;
         $package = Package::create($package_name);
-        $alias = is_numeric($key) ? $package_name : $key;
+
+        // Custom Label
 
         if (@$config->label) {
             $package->label = $config->label;
         }
 
+        // Generic package config
+
         if (@$config->config) {
             $package->config = $config->config;
         }
 
-        Package::rput($alias, $package);
+        Package::rput($package_name, $package);
 
         foreach (@$package->blends ?: [] as $blend) {
             Config::get()->blends[] = $blend;
