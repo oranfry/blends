@@ -627,34 +627,3 @@ function get_file_info($name)
         'filename' => basename($name),
     ];
 }
-
-function init_blends()
-{
-    blends_load_packages();
-}
-
-function blends_load_packages()
-{
-    foreach (@Config::get()->packages ?: [] as $config) {
-        $package_name = $config->name;
-        $package = Package::create($package_name);
-
-        // Custom Label
-
-        if (@$config->label) {
-            $package->label = $config->label;
-        }
-
-        // Generic package config
-
-        if (@$config->config) {
-            $package->config = $config->config;
-        }
-
-        Package::rput($package_name, $package);
-
-        foreach (@$package->blends ?: [] as $blend) {
-            Config::get()->blends[] = $blend;
-        }
-    }
-}
