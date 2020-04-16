@@ -1,5 +1,5 @@
 <?php
-class Linetype extends Thing
+class Linetype
 {
     public $children = [];
     public $links = [];
@@ -12,6 +12,20 @@ class Linetype extends Thing
     public $fuse_fields = [];
     public $unfuse_fields = [];
     public $label;
+
+    public static function load($name)
+    {
+        $linetypeclass = @Config::get()->linetypes[$name];
+
+        if (!$linetypeclass) {
+            error_response("No such linetype '{$name}'");
+        }
+
+        $linetype = new $linetypeclass();
+        $linetype->name = $name;
+
+        return $linetype;
+    }
 
     public function complete($line)
     {

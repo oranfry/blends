@@ -569,7 +569,7 @@ function find_parent_linetypes($linetype_name, &$child_descriptors)
     $child_descriptors = [];
     $seen = [];
 
-    foreach (Config::get()->blends as $_blend_name) {
+    foreach (array_keys(Config::get()->blends) as $_blend_name) {
         foreach (Blend::load($_blend_name)->linetypes as $_linetype_name) {
             if (@$seen[$_linetype_name]) {
                 continue;

@@ -1,5 +1,5 @@
 <?php
-class Blend extends Thing
+class Blend
 {
     public $label;
     public $groupby;
@@ -9,6 +9,20 @@ class Blend extends Thing
     public $showass = [];
     public $linetypes = [];
     public $fields = [];
+
+    public static function load($name)
+    {
+        $blendclass = @Config::get()->blends[$name];
+
+        if (!$blendclass) {
+            error_response("No such blend '{$name}'");
+        }
+
+        $blend = new $blendclass();
+        $blend->name = $name;
+
+        return $blend;
+    }
 
     public static function delete($name, $filters)
     {
@@ -228,8 +242,8 @@ class Blend extends Thing
     {
         $blends = [];
 
-        foreach (Config::get()->blends as $blend) {
-            $blends[] = Blend::load($blend);
+        foreach (array_keys(Config::get()->blends) as $name) {
+            $blends[] = Blend::load($name);
         }
 
         return $blends;
