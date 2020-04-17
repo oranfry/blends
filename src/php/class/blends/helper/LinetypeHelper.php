@@ -3,11 +3,8 @@ namespace blends\helper;
 
 class LinetypeHelper
 {
-    public static function add_tag_field($linetype, $fieldname, $fuse = null, $extra_unfuses = null, $after_field = null)
+    public static function add_field($linetype, $field, $after_field = null)
     {
-        $fuse = $fuse ?? "t.{$fieldname}";
-        $variable = ":{$fieldname}";
-
         if ($after_field) {
             $pos = array_search($after_field, array_map(function($v){
                 return $v->name;
@@ -16,11 +13,19 @@ class LinetypeHelper
             $pos = count($linetype->fields);
         }
 
-        array_splice($linetype->fields, $pos, 0, [(object)[
+        array_splice($linetype->fields, $pos, 0, [$field]);
+    }
+
+    public static function add_tag_field($linetype, $fieldname, $fuse = null, $extra_unfuses = null, $after_field = null)
+    {
+        $fuse = $fuse ?? "t.{$fieldname}";
+        $variable = ":{$fieldname}";
+
+        static::add_field($linetype, (object)[
             'name' => $fieldname,
             'type' => 'text',
             'fuse' => $fuse,
-        ]]);
+        ], $after_field);
 
         $linetype->unfuse_fields[$fuse] = $variable;
 
