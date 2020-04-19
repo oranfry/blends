@@ -455,4 +455,15 @@ class Linetype
 
         unlink_record($id, $parentid, $tablelink);
     }
+
+    public function build_class_field_fuse($fieldname)
+    {
+        $field = @filter_objects($this->fields, 'name', 'is', $fieldname)[0];
+
+        if (!$field) {
+            return;
+        }
+
+        $field->fuse = "if ((" . implode(') or (', $field->clauses) . "), '{$fieldname}', '')";
+    }
 }
