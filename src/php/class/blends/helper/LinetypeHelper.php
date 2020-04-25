@@ -16,23 +16,23 @@ class LinetypeHelper
         array_splice($linetype->fields, $pos, 0, [$field]);
     }
 
-    public static function add_tag_field($linetype, $fieldname, $fuse = null, $extra_unfuses = null, $after_field = null)
+    public static function add_tag_field($linetype, $fieldname, $fuse = null, $unfuses = null, $after_field = null)
     {
-        $fuse = $fuse ?? "t.{$fieldname}";
-        $variable = ":{$fieldname}";
+        $variable = ":{t}_{$fieldname}";
 
-        static::add_field($linetype, (object)[
+        $field = (object)[
             'name' => $fieldname,
             'type' => 'text',
-            'fuse' => $fuse,
-        ], $after_field);
+        ];
 
-        $linetype->unfuse_fields[$fuse] = $variable;
+        if ($fuse) {
+            $field->fuse = $fuse;
+        }
 
-        if ($extra_unfuses) {
-            foreach ($extra_unfuses as $unfuse) {
-                $linetype->unfuse_fields[$unfuse] = $variable;
-            }
+        static::add_field($linetype, $field, $after_field);
+
+        foreach ($unfuses ?: [] as $unfuse) {
+            $linetype->unfuse_fields[$unfuse] = $variable;
         }
     }
 

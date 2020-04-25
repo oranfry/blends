@@ -185,7 +185,7 @@ class Blend
                 continue;
             }
 
-            $_records = find_lines($linetype, $_filters);
+            $_records = $linetype->find_lines($_filters);
 
             foreach ($_records as $record) {
                 $record->type = @$blend->hide_types[$linetype->name] ?: $linetype->name;
@@ -264,7 +264,7 @@ class Blend
                 continue;
             }
 
-            $lines = find_lines($linetype, $_filters);
+            $lines = $linetype->find_lines($_filters);
 
             foreach ($lines as $line) {
                 $children = load_children($linetype, $line);
@@ -274,93 +274,51 @@ class Blend
         }
     }
 
-    public static function summaries($name, $filters)
+    public static function summary($name, $filters)
     {
         $blend = Blend::load($name);
-        $records = static::search($name, $filters);
+        $summary_fields = filter_objects($blend->fields, 'summary', 'is', 'sum');
+
+        if (!count($summary_fields)) {
+            return [];
+        }
+
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
         }, $blend->linetypes);
 
-        if (@$blend->groupby) {
-            $groupfield = $blend->groupby;
+        $balances = (object) [];
+
+        foreach ($summary_fields as $field) {
+            $balances->{$field->name} = '0.00';
         }
 
-        if (is_string(@$blend->cum)) {
-            $cum = false;
+        foreach ($linetypes as $linetype) {
+            $linetype_filters = [];
 
             foreach ($filters as $filter) {
-                if ($filter->field == $blend->cum) {
-                    $cum = true;
-                }
-            }
-        } else {
-            $cum = @$blend->cum;
-        }
+                $linetype_field = @filter_objects($linetype->fields, 'name', 'is', $filter->field)[0];
+                $field = @filter_objects($blend->fields, 'name', 'is', $filter->field)[0];
 
-        $summaries = [];
-
-        if (count(filter_objects($blend->fields, 'summary', 'is', 'sum'))) {
-            $balances = [];
-
-            if (@$blend->past) {
-                foreach ($linetypes as $linetype) {
-                    $_summary_filters = [];
-
-                    foreach ($filters as $filter) {
-                        $linetype_field = @filter_objects($linetype->fields, 'name', 'is', $filter->field)[0];
-                        $field = @filter_objects($blend->fields, 'name', 'is', $filter->field)[0];
-
-                        if ($linetype_field) {
-                            $_summary_filters[] = $filter;
-                        } elseif (
-                            $filter->cmp == '=' && $filter->value != @$field->default
-                            ||
-                            $filter->cmp == 'like' && !preg_match('/' . str_replace('%', '.*', $filter->value) . '/i', $field->default)
-                        ) {
-                            continue 2;
-                        }
-                    }
-
-                    $_balances = summarise_lines($linetype, $_summary_filters);
-
-                    foreach ($blend->fields as $field) {
-                        if (@$field->summary != 'sum') {
-                            continue;
-                        }
-
-                        $balances[$field->name] = bcadd(@$balances[$field->name] ?: '0.00', @$_balances[$field->name] ?: '0.00', 2);
-                    }
+                if ($linetype_field) {
+                    $linetype_filters[] = $filter;
+                } elseif (
+                    $filter->cmp == '=' && $filter->value != @$field->default
+                    ||
+                    $filter->cmp == 'like' && !preg_match('/' . str_replace('%', '.*', $filter->value) . '/i', $field->default)
+                ) {
+                    continue 2;
                 }
             }
 
-            if ($cum) {
-                $summaries['initial'] = (object) $balances;
-            }
+            $summary = $linetype->find_lines($linetype_filters, null, null, null, true);
 
-            foreach ($records as $record) {
-                foreach ($blend->fields as $_field) {
-                    if (!@$_field->summary == 'sum') {
-                        continue;
-                    }
-
-                    if (!isset($summaries[$record->{$groupfield}])) {
-                        $summaries[$record->{$groupfield}] = (object) [];
-                    }
-
-                    if (!property_exists($summaries[$record->{$groupfield}], $_field->name)) {
-                        $summaries[$record->{$groupfield}]->{$_field->name} = (@$cum_summaries_bool || @$cum) ? $balances[$_field->name] : '0.00';
-                    }
-
-                    $new_balance = bcadd($summaries[$record->{$groupfield}]->{$_field->name}, $record->{$_field->name}, 2);
-
-                    $summaries[$record->{$groupfield}]->{$_field->name} = $new_balance;
-                    $balances[$_field->name] = $new_balance;
-                }
+            foreach ($summary_fields as $field) {
+                $balances->{$field->name} = bcadd($balances->{$field->name}, @$summary->{$field->name} ?? '0.00', 2);
             }
         }
 
-        return $summaries;
+        return $balances;
     }
 
     public static function update($name, $filters, $data)
@@ -407,7 +365,7 @@ class Blend
             $q = "update {$linetype_db_table} t {$joinClause} set {$updatesClause} where t.id = :id";
             $stmt = Db::prepare($q);
 
-            $lines = find_lines($linetype, $_filters);
+            $lines = $linetype->find_lines($_filters);
 
             foreach ($lines as $line) {
                 foreach ($linetype->fields as $field) {

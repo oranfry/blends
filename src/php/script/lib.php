@@ -80,255 +80,6 @@ function ff($date, $day = 'Mon')
     return $date;
 }
 
-function find_lines(
-    $linetype,
-    $filters = null,
-    $parentId = null,
-    $parentLink = null,
-    $customClause = null
-) {
-    list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, , $idClauses) = lines_prepare_search($linetype, $filters, $parentId, $parentLink);
-
-    $whereClauses = array_merge(
-        array_map(function($c){ return "({$c})"; }, @$linetype->clauses ?? []),
-        $filterClauses,
-        $parentClauses,
-        $customClause ? [$customClause] : [],
-        $linetypeClauses
-    );
-
-    $fieldsClause = array_merge(
-        ['t.id id'],
-        $idClauses,
-        array_map(
-            function ($v) {
-                return "{$v->fuse} `{$v->name}`";
-            },
-            array_filter($linetype->fields, function($v){
-                return $v->type != 'file';
-            })
-        )
-    );
-
-    $joinClause = implode(' ', $joinClauses);
-    $orderByClause = implode(', ', $orderbys);
-    $fieldsClause = implode(', ', $fieldsClause);
-    $whereClause = count($whereClauses) ? implode(' and ', $whereClauses) : '1';
-
-    $linetype_db_table = Table::load($linetype->table)->table;
-
-    $q = "select {$fieldsClause} from `{$linetype_db_table}` t {$joinClause} where {$whereClause} order by {$orderByClause}";
-
-    $r = Db::succeed($q);
-
-    if (!$r) {
-        error_response(Db::error() . "\n\n$q\n\nlinetype: \"{$linetype->name}\"", 500);
-    }
-
-    $lines = [];
-
-    while ($row = mysqli_fetch_assoc($r)) {
-        $line = (object) $row;
-
-        $line->type = $linetype->name;
-        $line->parenttype = @$row['parenttype'];
-        $line->parentid = @$row[$row['parenttype'] . '_id'];
-
-        foreach ($linetype->fields as $_field) {
-            if ($_field->type == 'file' && defined('FILES_HOME')) {
-                $path = ($_field->path)($line);
-                $file = FILES_HOME . '/' . $path;
-
-                if (file_exists($file)) {
-                    $line->{$_field->name} = $path;
-                }
-            }
-
-            if (property_exists($_field, 'calc')) {
-                $line->{$_field->name} = ($_field->calc)($line);
-            }
-        }
-
-        if ($parentId) {
-            $line->parent = $parentId;
-            $line->parent_link = $parentLink;
-        }
-
-        $lines[] = $line;
-    }
-
-    return $lines;
-}
-
-function lines_prepare_search(
-    $linetype,
-    $filters = null,
-    $parentId = null,
-    $parentLink = null,
-    $customClause = null
-) {
-    $filters = $filters ?? [];
-    $orderbys = ["t.id"];
-    $filterClauses = [];
-
-    foreach ($filters as $filter) {
-        $cmp = @$filter->cmp ?: '=';
-
-        if ($cmp == 'custom') {
-            $field = @filter_objects($linetype->fields, 'name', 'is', $filter->field)[0];
-
-            $filterClauses[] = ($filter->sql)($field->fuse);
-            continue;
-        }
-
-        if ($filter->field == 'id') {
-            $expression = 't.id';
-        } else {
-            $field = @filter_objects($linetype->fields, 'name', 'is', $filter->field)[0];
-
-            if (!$field) {
-                error_response("Cant find fuse expression for filter field {$linetype->name} {$filter->field}\n\n" . var_export($linetype->fields, 1));
-            }
-
-            $expression = $field->fuse;
-        }
-
-        if ($cmp == '*=') {
-            $repeater = Repeater::create($filter->value);
-            $filterClauses[] = $repeater->get_clause($expression);
-        } elseif (is_array($filter->value) && $cmp == '=') {
-            $value =  '(' . implode(',', array_map(function($e){ return "'{$e}'"; }, $filter->value)) . ')';
-            $filterClauses[] = "{$expression} in {$value}";
-        } else {
-            $filterClauses[] = "{$expression} {$cmp} '{$filter->value}'";
-        }
-    }
-
-    $linetype_db_table = Table::load($linetype->table)->table;
-
-    $joinClauses = [];
-    $idClauses = [];
-    $joinTables = ["{$linetype_db_table} t"];
-    $parentClauses = [];
-
-    if ($parentLink && $parentId) {
-        $tablelink = Tablelink::load($parentLink);
-
-        list($_joinClause, $_fields, $_groupbys, $_joinTable, $_idClause) = generate_link_join_clause($tablelink, $tablelink->ids[0], 't', 0, true);
-
-        $joinClauses[] = $_joinClause;
-        $idClauses[] = $_idClause;
-        $joinTables[] = $_joinTable;
-        $parentClauses[] = "{$tablelink->ids[0]}.id = '{$parentId}'";
-    }
-
-    $inlinejoins = get_inline_joins(@$linetype->inlinelinks ?? []);
-
-    foreach ($inlinejoins as $inlinejoin) {
-        list($_joinClause, $_fields, $_groupbys, $_joinTable, $_idClause) = $inlinejoin;
-
-        $joinClauses[] = $_joinClause;
-        $idClauses[] = $_idClause;
-        $joinTables[] = $_joinTable;
-    }
-
-    $linetypeClauses = array_map(function($c){ return "({$c})"; }, @$linetype->clauses ?? []);
-
-    return [$joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, $joinTables, $idClauses];
-}
-
-function get_inline_joins($links, $basealias = null)
-{
-    $joins = [];
-
-    foreach ($links as $link) {
-        $childlinetype = Linetype::load($link->linetype);
-        $tablelink = Tablelink::load($link->tablelink);
-        $side = @$link->reverse ? 0 : 1;
-        $leftJoin = @$link->required ? false : true;
-
-        $alias = ($basealias ? $basealias . '_' : '') . (@$link->alias ?? $tablelink->ids[$side]);
-        $joins[] = generate_link_join_clause($tablelink, $alias, ($basealias ?? 't'), $side, $leftJoin);
-
-        if (!@$link->norecurse) {
-            $joins = array_merge($joins, get_inline_joins(@$childlinetype->inlinelinks ?? [], $alias));
-        }
-    }
-
-    return $joins;
-}
-
-function collect_inline_links($linetype, $basealias = null)
-{
-    $links = [];
-
-    foreach (@Linetype::load($linetype)->inlinelinks ?: [] as $_link) {
-        $link = clone $_link;
-        $link->parenttype = $linetype;
-        $side = @$link->reverse ? 0 : 1;
-        $tablelink = Tablelink::load($link->tablelink);
-        $alias = ($basealias ? $basealias . '_' : '') . (@$link->alias ?? $tablelink->ids[$side]);
-        $link->alias = $alias;
-        $links[] = $link;
-
-        if (!@$_link->norecurse) {
-            $links = array_merge($links, collect_inline_links($link->linetype, $alias));
-        }
-    }
-
-    return $links;
-}
-
-function summarise_lines(
-    $linetype,
-    $filters = [],
-    $parentId = null,
-    $parentLink = null,
-    $customClause = null
-) {
-    list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses) = lines_prepare_search($linetype, $filters, $parentId, $parentLink);
-
-    $whereClauses = array_merge(
-        array_map(function($c){ return "({$c})"; }, @$linetype->clauses ?? []),
-        $filterClauses,
-        $parentClauses,
-        $customClause ? [$customClause] : [],
-        $linetypeClauses
-    );
-
-    $fields = [];
-
-    foreach ($linetype->fields as $field) {
-        if (@$field->summary == 'sum') {
-            if (!@$field->fuse) {
-                die("Fuse expression missing for {$field->name}");
-            }
-
-            $fields[] = "sum({$field->fuse}) {$field->name}";
-        }
-    }
-
-    if (!count($fields)) {
-        return [];
-    }
-
-    $joinClause = implode(' ', $joinClauses);
-    $orderByClause = implode(', ', $orderbys);
-    $fieldsClause = implode(', ', $fields);
-    $whereClause = count($whereClauses) ? implode(' and ', $whereClauses) : '1';
-
-    $linetype_db_table = Table::load($linetype->table)->table;
-
-    $q = "select {$fieldsClause} from `{$linetype_db_table}` t {$joinClause} where {$whereClause} order by {$orderByClause}";
-    $r = DB::succeed($q);
-
-    if (!$r) {
-        error_response(Db::error() . "\n\n$q\n\nlinetype: \"{$linetype->name}\"", 500);
-    }
-
-    return mysqli_fetch_assoc($r) ?: [];
-}
-
 function load_children($linetype, $parent)
 {
     $child_sets = [];
@@ -348,7 +99,7 @@ function load_childset($linetype, $parent, $descriptor)
     $fields = $child_linetype->fields;
 
     $childset = (object) [];
-    $childset->lines = find_lines($child_linetype, null, $id, $descriptor->parent_link);
+    $childset->lines = $child_linetype->find_lines(null, $id, $descriptor->parent_link);
 
     $summary = (object) [];
     $hasSummaries = array_reduce($fields, function ($c, $v) {
@@ -374,6 +125,18 @@ function load_childset($linetype, $parent, $descriptor)
     }
 
     return $childset;
+}
+
+function join_r($tablelink, $alias, $base_alias, $otherside = 1, $left = true) {
+    $myside = ($otherside + 1) % 2;
+    $join = $left ? 'left join' : 'join';
+    $jointable = Table::load($tablelink->tables[$otherside]);
+    $join_db_table = $jointable->table;
+
+    $my_id = ($tablelink->ids[$myside] ? $tablelink->ids[$myside] . '_' : '') . 'id';
+    $other_id = ($tablelink->ids[$otherside] ? $tablelink->ids[$otherside] . '_' : '') . 'id';
+
+    return "$join {$tablelink->middle_table} {$alias}_m on {$alias}_m.{$my_id} = {$base_alias}.id left join {$join_db_table} {$alias} on {$alias}.id = {$alias}_m.{$other_id}";
 }
 
 function generate_link_join_clause(
