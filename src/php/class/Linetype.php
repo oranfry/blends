@@ -197,8 +197,6 @@ class Linetype
                 $querydata[$matches[1][$i]] = $ids[$matches[1][$i]];
             }
 
-            kayoh_dump($querydata, $query);
-
             $stmt = Db::prepare($query);
             $result = $stmt->execute($querydata);
 
