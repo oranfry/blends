@@ -111,6 +111,12 @@ class Linetype
 
         $line = @$linetype->find_lines([(object)['field' => 'id', 'value' => $id]])[0];
 
+        foreach (get_object_vars($line) as $prop => $value) {
+            if (is_object($value)) {
+                unset($line->{$prop});
+            }
+        }
+
         if (!$line) {
             error_response('No such line', 400);
         }
@@ -118,7 +124,11 @@ class Linetype
         $child_sets = load_children($linetype, $line);
 
         $line->type = $linetype->name;
-        $line->astext = $linetype->astext($line, $child_sets);
+        $astext = $linetype->astext($line, $child_sets);
+
+        if ($astext) {
+            $line->astext = $astext;
+        }
 
         return $line;
     }
@@ -171,12 +181,6 @@ class Linetype
 
         $oldline = $id ? @$this->find_lines([(object)['field' => 'id', 'value' => $id]])[0] : null;
 
-        // foreach ($this->fields as $field) {
-        //     if ($field->type == 'file' && @$line->{$field->name}) {
-        //         $this->handle_upload($field, $line);
-        //     }
-        // }
-
         $unfuse_fields = [];
         $data = [];
         $statements = [];
@@ -192,8 +196,6 @@ class Linetype
             for ($i = 0; $i < count($matches[1]); $i++) {
                 $querydata[$matches[1][$i]] = $ids[$matches[1][$i]];
             }
-
-            kayoh_dump($querydata, $query);
 
             $stmt = Db::prepare($query);
             $result = $stmt->execute($querydata);
@@ -248,12 +250,33 @@ class Linetype
         }
 
         if (@$line) {
-            if (@$this->printonsave) {
-                print_line($this, $line, load_children($this, $line));
+            $line->id = $ids['t_id'];
+
+            if (@$line->parent) {
+                if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
+                    error_response('Invalid parent specification');
+                }
+
+                $parentlink = Tablelink::load($groups[1]);
+                $parentside = @array_flip($parentlink->ids)[$groups[2]];
+                $childside = ($parentside + 1) % 2;
+                $parentid = intval($groups[3]);
+
+                $query = "insert into {$parentlink->middle_table} ({$parentlink->ids[$parentside]}_id, {$parentlink->ids[$childside]}_id) values (:parentid, :lineid) on duplicate key update {$parentlink->ids[$parentside]}_id = :parentid, {$parentlink->ids[$childside]}_id = :lineid";
+                $querydata = [
+                    'parentid' => $parentid,
+                    'lineid' => $line->id
+                ];
+                $stmt = Db::prepare($query);
+                $result = $stmt->execute($querydata);
+
+                if (!$result) {
+                    error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                }
             }
 
-            if (@$line) {
-                $line->id = $ids['t_id'];
+            if (@$this->printonsave) {
+                print_line($this, $line, load_children($this, $line));
             }
         }
 
@@ -357,18 +380,23 @@ class Linetype
         }
 
         foreach (@$this->clauses ?: [] as $clause) {
-            $wheres[] = '(' . str_replace('{t}', 't', $clause) . ')';
+            $wheres[] = str_replace('{t}', 't', $clause);
         }
 
         $this->find_r('t', $selects, $joins, $summary);
 
+        if ($parentLink && $parentId) {
+            $tablelink = Tablelink::load($parentLink);
+            $joins[] = make_join($tablelink, 'parent', 't', 0, false);
+            $wheres[] = "parent.id = {$parentId}";
+        }
+
         $select = implode(', ', $selects);
         $join = implode(' ', $joins);
-        $where = implode(' AND ', array_map(function($c){ return "({$c})"; }, $wheres));
+        $where = count($wheres) ? 'where ' . implode(' AND ', array_map(function($c){ return "({$c})"; }, $wheres)) : '';
         $orderby = implode(', ', $orderbys);
 
-        $q = "select {$select} from `{$dbtable}` t {$join} where {$where} order by {$orderby}";
-
+        $q = "select {$select} from `{$dbtable}` t {$join} {$where} order by {$orderby}";
         $r = Db::succeed($q);
 
         if (!$r) {
@@ -426,7 +454,7 @@ class Linetype
             $leftJoin = @$child->required ? false : true;
             $childalias = $alias . '_'  . (@$child->alias ?? $tablelink->ids[$side]);
 
-            $joins[] = join_r($tablelink, $childalias, $alias, $side, $leftJoin);
+            $joins[] = make_join($tablelink, $childalias, $alias, $side, $leftJoin);
 
             if (@$child->norecurse) {
                 continue;
@@ -615,7 +643,11 @@ class Linetype
             }
 
             foreach ($this->fields as $field) {
-                $data["{$alias}_{$field->name}"] = @$line->{$field->name};
+                if ($field->type == 'file' && @$line->{$field->name}) {
+                    $this->handle_upload($field, $line);
+                } else {
+                    $data["{$alias}_{$field->name}"] = @$line->{$field->name};
+                }
             }
         }
 

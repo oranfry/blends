@@ -127,7 +127,7 @@ function load_childset($linetype, $parent, $descriptor)
     return $childset;
 }
 
-function join_r($tablelink, $alias, $base_alias, $otherside = 1, $left = true) {
+function make_join($tablelink, $alias, $base_alias, $otherside = 1, $left = true) {
     $myside = ($otherside + 1) % 2;
     $join = $left ? 'left join' : 'join';
     $jointable = Table::load($tablelink->tables[$otherside]);
