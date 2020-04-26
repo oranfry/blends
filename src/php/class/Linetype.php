@@ -197,6 +197,8 @@ class Linetype
                 $querydata[$matches[1][$i]] = $ids[$matches[1][$i]];
             }
 
+            kayoh_dump($querydata, $query);
+
             $stmt = Db::prepare($query);
             $result = $stmt->execute($querydata);
 
@@ -696,18 +698,6 @@ class Linetype
             }
         }
 
-        if ($was && !$is) {
-            if ($tablelink) {
-                $q = "delete from {$tablelink->middle_table} where {$tablelink->ids[0]}_id = :{$parentalias}_id and {$tablelink->ids[1]}_id = :oldlineid";
-                $querydata = ['oldlineid' => $oldline->id];
-                $statements[] = [$q, $querydata];
-            }
-
-            $q = "delete from {$dbtable} where id = :oldlineid";
-            $querydata = ['oldlineid' => $oldline->id];
-            $statements[] = [$q, $querydata];
-        }
-
         if (!$is || !$was) {
             foreach ($unfuse_fields as $field => $expression) {
                 if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
@@ -721,14 +711,14 @@ class Linetype
                 continue;
             }
 
-            $tablelink = Tablelink::load($child->tablelink);
+            $childtablelink = Tablelink::load($child->tablelink);
 
             if (@$child->reverse) {
-                $tablelink = $tablelink->reverse();
+                $childtablelink = $childtablelink->reverse();
             }
 
             $childlinetype = Linetype::load($child->linetype);
-            $childaliasshort = (@$child->alias ?? $tablelink->ids[1]);
+            $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
             $childline = $is && $this->has($line, $childaliasshort) ? (@$line->{$childaliasshort} ?? (object) []) : null;
             $childoldline = @$oldline->{$childaliasshort};
 
@@ -736,13 +726,25 @@ class Linetype
                 $alias . '_'  . $childaliasshort,
                 $childline,
                 $childoldline,
-                $tablelink,
+                $childtablelink,
                 $alias,
                 $unfuse_fields,
                 $data,
                 $statements,
                 $ids
             );
+        }
+
+        if ($was && !$is) {
+            if ($tablelink) {
+                $q = "delete from {$tablelink->middle_table} where {$tablelink->ids[0]}_id = :{$parentalias}_id and {$tablelink->ids[1]}_id = :oldlineid";
+                $querydata = ['oldlineid' => $oldline->id];
+                $statements[] = [$q, $querydata];
+            }
+
+            $q = "delete from {$dbtable} where id = :oldlineid";
+            $querydata = ['oldlineid' => $oldline->id];
+            $statements[] = [$q, $querydata];
         }
     }
 }
