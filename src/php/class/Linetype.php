@@ -78,36 +78,9 @@ class Linetype
         return $child_sets[$childsetname];
     }
 
-    public static function delete($name, $id)
+    public function delete($id)
     {
-        $linetype = Linetype::load($name);
-
-        if (isset($_GET['parentid']) || isset($_GET['parenttype'])) {
-            if (!preg_match('/^[0-9]+$/', @$_GET['parentid']) || !preg_match('/^[a-z]+$/', @$_GET['parenttype'])) {
-                error_response('Invalid parent specifications');
-            }
-
-            $parentid = @$_GET['parentid'];
-            $parentlinetype = Linetype::load($_GET['parenttype']);
-
-            $tablelink = null;
-
-            foreach ($parentlinetype->children as $child) {
-                if ($child->linetype == $linetype->name) {
-                    $tablelink = Tablelink::load($child->parent_link);
-
-                    break;
-                }
-            }
-
-            unlink_record($id, $parentid, $tablelink);
-        }
-
-        $result = delete_record($linetype->table, $id);
-
-        if ($result) {
-            error_response($result);
-        }
+        $this->save(null, $id);
     }
 
     public static function html($name, $id)
@@ -192,60 +165,11 @@ class Linetype
             error_response("Could not resolve table {$this->table} to a database table");
         }
 
-        $this->complete($line);
-        $errors = $this->validate($line);
-
-        if (count($errors)) {
-            error_response("Invalid {$this->name}: "  . implode(', ', $errors));
-        }
-
-        unset($line->id); // ignore id given in json data
-
-        $unfuse_fields = $this->unfuse_fields; // take a copy to play with
-
-        if ($id) {
+        if (is_object($line)) {
             $line->id = $id;
-            $oldline = @$this->find_lines([(object)['field' => 'id', 'value' => $line->id,]])[0] ?: (object) [];
-        } else {
-            $needed_vars = [];
-            $fields = [];
-            $values = [];
-
-            foreach ($unfuse_fields as $field => $expression) {
-                if (preg_match('/^t\.([a-z_]+)$/', $field, $groups)) {
-                    $fields[] = $groups[1];
-                    $values[] = $expression;
-
-                    preg_match_all('/:([a-z_]+)/', $expression, $matches);
-
-                    for ($i = 0; $i < count($matches[1]); $i++) {
-                        $needed_vars[] = $matches[1][$i];
-                    }
-
-                    unset($unfuse_fields[$field]);
-                }
-            }
-
-            $querydata = [];
-
-            foreach ($needed_vars as $nv) {
-                $querydata[$nv] = @$line->{$nv} ?: null;
-            }
-
-            $fieldsClause = implode(', ', $fields);
-            $valuesClause = implode(', ', $values);
-
-            $q = "insert into {$dbtable} ({$fieldsClause}) values ({$valuesClause})";
-            $stmt = Db::prepare($q);
-            $result = $stmt->execute($querydata);
-
-            if (!$result) {
-                error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}\n" . var_export($querydata, true));
-            }
-
-            $line->id = Db::pdo_insert_id();
-            $oldline = $line;
         }
+
+        $oldline = $id ? @$this->find_lines([(object)['field' => 'id', 'value' => $id]])[0] : null;
 
         // foreach ($this->fields as $field) {
         //     if ($field->type == 'file' && @$line->{$field->name}) {
@@ -255,8 +179,33 @@ class Linetype
 
         $unfuse_fields = [];
         $data = [];
+        $statements = [];
+        $ids = [];
 
-        $this->save_r('t', $line, $oldline, $unfuse_fields, $data);
+        $this->save_r('t', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids);
+
+        foreach ($statements as $statement) {
+            @list($query, $querydata, $saveto) = $statement;
+
+            preg_match_all('/:([a-z_]+_id)/', $query, $matches);
+
+            for ($i = 0; $i < count($matches[1]); $i++) {
+                $querydata[$matches[1][$i]] = $ids[$matches[1][$i]];
+            }
+
+            kayoh_dump($querydata, $query);
+
+            $stmt = Db::prepare($query);
+            $result = $stmt->execute($querydata);
+
+            if (!$result) {
+                error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+            }
+
+            if ($saveto) {
+                $ids[$saveto] = Db::pdo_insert_id();
+            }
+        }
 
         if (count($unfuse_fields)) {
             $updates = [];
@@ -282,8 +231,8 @@ class Linetype
             $join = implode(' ', $joins);
             $set = implode(', ', $updates);
 
-            $q = "update {$dbtable} t {$join} set {$set} where t.id = :id";
-            $stmt = Db::prepare($q);
+            $query = "update {$dbtable} t {$join} set {$set} where t.id = :id";
+            $stmt = Db::prepare($query);
 
             $querydata = ['id' => $line->id];
 
@@ -294,12 +243,18 @@ class Linetype
             $result = $stmt->execute($querydata);
 
             if (!$result) {
-                error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}\n" . var_export($querydata, true));
+                error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
             }
         }
 
-        if (@$this->printonsave) {
-            print_line($this, $line, load_children($this, $line));
+        if (@$line) {
+            if (@$this->printonsave) {
+                print_line($this, $line, load_children($this, $line));
+            }
+
+            if (@$line) {
+                $line->id = $ids['t_id'];
+            }
         }
 
         return $line;
@@ -636,14 +591,8 @@ class Linetype
         file_put_contents($filepath, $result);
     }
 
-    private function save_r($alias, $line, $oldline, &$unfuse_fields, &$data)
+    private function save_r($alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids)
     {
-        $this->unpack($line);
-
-        foreach ($this->fields as $field) {
-            $data["{$alias}_{$field->name}"] = @$line->{$field->name};
-        }
-
         foreach ($this->unfuse_fields as $field => $expression) {
             $field_full = str_replace('{t}', $alias, $field);
 
@@ -653,101 +602,115 @@ class Linetype
             }
         }
 
+        $is = $line != null;
+        $was = $oldline != null;
+
+        if ($is) {
+            $this->complete($line);
+            $errors = $this->validate($line);
+            $this->unpack($line);
+
+            if (count($errors)) {
+                error_response("Invalid {$this->name}: "  . implode(', ', $errors));
+            }
+
+            foreach ($this->fields as $field) {
+                $data["{$alias}_{$field->name}"] = @$line->{$field->name};
+            }
+        }
+
+        $dbtable = @Config::get()->tables[$this->table];
+
+        if ($was) {
+            $ids["{$alias}_id"] = $oldline->id;
+
+            if ($is) {
+                $line->id = $oldline->id;
+            }
+        } else {
+            $fields = [];
+            $values = [];
+            $needed_vars = [];
+
+            foreach ($unfuse_fields as $field => $expression) {
+                if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
+                    $fields[] = $groups[1];
+                    $values[] = $expression;
+
+                    preg_match_all('/:([a-z_]+)/', $expression, $matches);
+
+                    for ($i = 0; $i < count($matches[1]); $i++) {
+                        $needed_vars[] = $matches[1][$i];
+                    }
+                }
+            }
+
+            $fieldsClause = implode(', ', $fields);
+            $valuesClause = implode(', ', $values);
+
+            $q = "insert into {$dbtable} ({$fieldsClause}) values ({$valuesClause})";
+
+            $querydata = [];
+
+            foreach ($needed_vars as $nv) {
+                $querydata[$nv] = $data[$nv];
+            }
+
+            $statements[] = [$q, $querydata, "{$alias}_id"];
+
+            if ($tablelink) {
+                $q = "insert into {$tablelink->middle_table} ({$tablelink->ids[0]}_id, {$tablelink->ids[1]}_id) values (:{$parentalias}_id, :{$alias}_id)";
+                $statements[] = [$q, []];
+            }
+        }
+
+        if ($was && !$is) {
+            if ($tablelink) {
+                $q = "delete from {$tablelink->middle_table} where {$tablelink->ids[0]}_id = :{$parentalias}_id and {$tablelink->ids[1]}_id = :oldlineid";
+                $querydata = ['oldlineid' => $oldline->id];
+                $statements[] = [$q, $querydata];
+            }
+
+            $q = "delete from {$dbtable} where id = :oldlineid";
+            $querydata = ['oldlineid' => $oldline->id];
+            $statements[] = [$q, $querydata];
+        }
+
+        if (!$is || !$was) {
+            foreach ($unfuse_fields as $field => $expression) {
+                if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
+                    unset($unfuse_fields[$field]);
+                }
+            }
+        }
+
         foreach (@$this->inlinelinks ?? [] as $child) {
             if (@$child->norecurse) {
                 continue;
             }
 
-            $side = @$child->reverse ? 0 : 1;
-            $otherside = ($side + 1) % 2;
             $tablelink = Tablelink::load($child->tablelink);
+
+            if (@$child->reverse) {
+                $tablelink = $tablelink->reverse();
+            }
+
             $childlinetype = Linetype::load($child->linetype);
-            $childaliasshort = (@$child->alias ?? $tablelink->ids[$side]);
-            $childline = @$line->{$childaliasshort};
-            $childdbtable = @Config::get()->tables[$childlinetype->table];
+            $childaliasshort = (@$child->alias ?? $tablelink->ids[1]);
+            $childline = $is && $this->has($line, $childaliasshort) ? (@$line->{$childaliasshort} ?? (object) []) : null;
             $childoldline = @$oldline->{$childaliasshort};
 
-            $has = $this->has($line, $childaliasshort);
-            $had = $childoldline != null;
-
-            if ($has) {
-                $childlinetype->complete($childline);
-                $errors = $childlinetype->validate($childline);
-
-                if (count($errors)) {
-                    error_response("Invalid {$childlinetype->name}: "  . implode(', ', $errors));
-                }
-            }
-
-            if ($has && $had) {
-                $childline->id = $childoldline->id;
-            } elseif ($has && !$had) {
-                $fields = [];
-                $values = [];
-                $needed_vars = [];
-
-                foreach ($unfuse_fields as $field => $expression) {
-                    if (preg_match("/^{$alias}_{$childaliasshort}\.([a-z_]+)$/", $field, $groups)) {
-                        $fields[] = $groups[1];
-                        $values[] = $expression;
-
-                        preg_match_all('/:([a-z_]+)/', $expression, $matches);
-
-                        for ($i = 0; $i < count($matches[1]); $i++) {
-                            $needed_vars[] = $matches[1][$i];
-                        }
-                    }
-                }
-
-                $querydata = [];
-
-                foreach ($needed_vars as $nv) {
-                    $querydata[$nv] = @$line->{$nv} ?: null;
-                }
-
-                $fieldsClause = implode(', ', $fields);
-                $valuesClause = implode(', ', $values);
-
-                $q = "insert into {$childdbtable} ({$fieldsClause}) values ({$valuesClause})";
-
-                $stmt = Db::prepare($q);
-                $result = $stmt->execute($querydata);
-
-                if (!$result) {
-                    error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}\n" . var_export($querydata, true));
-                }
-
-                $childid = Db::pdo_insert_id();
-
-                $q = "insert into {$tablelink->middle_table} ({$tablelink->ids[$otherside]}_id, {$tablelink->ids[$side]}_id) values ({$line->id}, {$childid})";
-                Db::succeed($q, "Problem creating assoc link");
-            } elseif ($had && !$has) {
-                // TODO: use prepared statement
-
-                $q = "delete from {$tablelink->middle_table} where {$tablelink->ids[$otherside]}_id = {$oldline->id} and {$tablelink->ids[$side]}_id = {$childoldline->id}";
-                Db::succeed($q, "Problem deleting unneeded assoc link");
-
-                $q = "delete from {$childdbtable} where id = {$childoldline->id}";
-                Db::succeed($q, "Problem deleting unneeded assoc");
-            }
-
-            if (!$has || !$had) {
-                foreach ($unfuse_fields as $field => $expression) {
-                    if (preg_match("/^{$alias}_{$childaliasshort}\.([a-z_]+)$/", $field, $groups)) {
-                        unset($unfuse_fields[$field]);
-                    }
-                }
-            }
-
-            if ($has) {
-                $childlinetype->save_r(
-                    $alias . '_'  . $childaliasshort,
-                    $childline,
-                    $childoldline,
-                    $unfuse_fields,
-                    $data
-                );
-            }
+            $childlinetype->save_r(
+                $alias . '_'  . $childaliasshort,
+                $childline,
+                $childoldline,
+                $tablelink,
+                $alias,
+                $unfuse_fields,
+                $data,
+                $statements,
+                $ids
+            );
         }
     }
 }
