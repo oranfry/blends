@@ -631,7 +631,9 @@ class Linetype
         }
 
         $is = $line != null;
-        $was = $oldline != null;
+
+        $is = is_object($line) && !(@$line->_is === false);
+        $was = is_object($oldline);
 
         if ($is) {
             $this->complete($line);
