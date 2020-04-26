@@ -661,7 +661,7 @@ class Linetype
             if ($is) {
                 $line->id = $oldline->id;
             }
-        } else {
+        } elseif ($is) {
             $fields = [];
             $values = [];
             $needed_vars = [];
