@@ -597,8 +597,6 @@ class Linetype
             }
         }
 
-        $is = $line != null;
-
         $is = is_object($line) && !(@$line->_is === false);
         $was = is_object($oldline);
 
