@@ -22,9 +22,6 @@ class Repeater
             error_response('invalid repeater: ' . $serialised);
         }
 
-        unset($groups[0]);
-        kayoh_dump($groups);
-
         $pegdate = null;
         $n = null;
         $day = null;
