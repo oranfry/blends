@@ -27,6 +27,32 @@ class Linetype
         return $linetype;
     }
 
+    public static function find_parent_linetypes($linetype_name, &$child_descriptors = [])
+    {
+        $parents = [];
+        $child_descriptors = [];
+        $seen = [];
+
+        foreach (array_keys(Config::get()->blends) as $_blend_name) {
+            foreach (Blend::load($_blend_name)->linetypes as $_linetype_name) {
+                if (@$seen[$_linetype_name]) {
+                    continue;
+                }
+
+                $seen[$_linetype_name] = true;
+                $_linetype = Linetype::load($_linetype_name);
+                $mes = @filter_objects($_linetype->children, 'linetype', 'is', $linetype_name);
+
+                foreach ($mes as $me) {
+                    $parents[] = $_linetype;
+                    $child_descriptors[] = $me;
+                }
+            }
+        }
+
+        return $parents;
+    }
+
     public function complete($line)
     {
     }
@@ -45,229 +71,146 @@ class Linetype
         return [];
     }
 
-    public function astext($line, $child_sets)
+    public function astext($line)
     {
         return null;
     }
 
-    public function ashtml($line, $child_sets)
+    public function ashtml($line)
     {
         return null;
     }
 
-
-    public static function childset($name, $id, $childsetname)
+    public function delete($filters)
     {
-        $linetype = Linetype::load($name);
-        $parenttype = null;
-        $parentlink = null;
-        $parentid = null;
+        $oldlines = $this->find_lines($filters);
+        $lines = [];
 
-        $line = @$linetype->find_lines([(object)['field' => 'id', 'value' => $id]])[0];
-
-        if (!$line) {
-            error_response('No such line', 400);
+        foreach ($oldlines as $line) {
+            $lines[] = (object)['id' => $line->id, '_is' => false];
         }
 
-        $child_sets = load_children($linetype, $line);
-
-        if (!isset($child_sets[$childsetname])) {
-            error_response('No such childset', 400);
-        }
-
-        return $child_sets[$childsetname];
+        $this->save($lines);
     }
 
-    public function delete($id)
+    public function print($filters)
     {
-        $this->save(null, $id);
-    }
+        $lines = $this->find_lines($filters);
 
-    public static function html($name, $id)
-    {
-        $linetype = Linetype::load($name);
-        $parenttype = null;
-        $parentlink = null;
-        $parentid = null;
+        foreach ($lines as $line) {
+            $this->load_children($line);
 
-        $line = @$linetype->find_lines([(object)['field' => 'id', 'value' => $id]])[0];
+            $contents = $this->astext($line);
 
-        if (!$line) {
-            error_response('No such line', 400);
-        }
-
-        $line->type = $linetype->name;
-        $child_sets = load_children($linetype, $line);
-
-        return $linetype->ashtml($line, $child_sets);
-    }
-
-    public static function get($name, $id)
-    {
-        $linetype = Linetype::load($name);
-        $parenttype = null;
-        $parentlink = null;
-        $parentid = null;
-
-        $line = @$linetype->find_lines([(object)['field' => 'id', 'value' => $id]])[0];
-
-        foreach (get_object_vars($line) as $prop => $value) {
-            if (is_object($value)) {
-                unset($line->{$prop});
+            if (!defined('PRINTER_FILE')) {
+                error_log("\n" . $contents);
+                continue; // lets not and say we did - for testing!
             }
+
+            $logofile = @Config::get()->logofile;
+
+            $printout = '';
+            $printout .= ESC."@"; // Reset to defaults
+
+            if ($logofile && file_exists($logofile)) {
+                $printout .= file_get_contents($logofile);
+                $printout .= "\n\n";
+            }
+
+            $printout .= wordwrap($contents, 42, "\n", true);
+            $printout .= ESC."d".chr(4);
+            $printout .= GS."V\x41".chr(3);
+
+            file_put_contents(PRINTER_FILE, $printout, FILE_APPEND);
         }
 
-        if (!$line) {
-            error_response('No such line', 400);
-        }
-
-        $child_sets = load_children($linetype, $line);
-
-        $line->type = $linetype->name;
-        $astext = $linetype->astext($line, $child_sets);
-
-        if ($astext) {
-            $line->astext = $astext;
-        }
-
-        return $line;
+        return ['messages' => ['Printed Happily']];
     }
 
-    public static function info($name)
+    public function save($lines)
     {
-        $linetype = Linetype::load($name);
-
-        $parents = find_parent_linetypes($linetype->name, $children);
-        $parenttypes = [];
-
-        foreach ($parents as $parent) {
-            $parenttypes[] = preg_replace('/.*\\\\/', '', get_class($parent));
+        if (!is_array($lines)) {
+            error_response("Linetype::save - please pass in an array of lines");
         }
 
-        $linetype->parenttypes = $parenttypes;
-
-        return $linetype;
-    }
-
-    public static function print($name, $id)
-    {
-        $linetype = Linetype::load($name);
-        $line = @$linetype->find_lines([(object)['field' => 'id', 'value' => $id]])[0];
-
-        if (!$line) {
-            error_response('No such line', 400);
-        }
-
-        $child_sets = load_children($linetype, $line);
-
-        print_line($linetype, $line, $child_sets);
-
-        $messages = ["Printed Happily"];
-
-        return $messages;
-    }
-
-    public function save($line, $id = null)
-    {
         $dbtable = @Config::get()->tables[$this->table];
 
         if (!$dbtable) {
             error_response("Could not resolve table {$this->table} to a database table");
         }
 
-        if (is_object($line)) {
-            $line->id = $id;
-        }
+        $oldlines = [];
+        $oldids = array_filter(map_objects($lines, 'id'));
 
-        $oldline = $id ? @$this->find_lines([(object)['field' => 'id', 'value' => $id]])[0] : null;
-
-        $unfuse_fields = [];
-        $data = [];
-        $statements = [];
-        $ids = [];
-
-        $this->save_r('t', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids);
-
-        foreach ($statements as $statement) {
-            @list($query, $querydata, $saveto) = $statement;
-
-            preg_match_all('/:([a-z_]+_id)/', $query, $matches);
-
-            for ($i = 0; $i < count($matches[1]); $i++) {
-                $querydata[$matches[1][$i]] = $ids[$matches[1][$i]];
-            }
-
-            $stmt = Db::prepare($query);
-            $result = $stmt->execute($querydata);
-
-            if (!$result) {
-                error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
-            }
-
-            if ($saveto) {
-                $ids[$saveto] = Db::pdo_insert_id();
+        if (count($oldids)) {
+            foreach ($this->find_lines([(object)['field' => 'id', 'value' => $oldids]]) as $oldline) {
+                $oldlines[$oldline->id] = $oldline;
             }
         }
 
-        if (count($unfuse_fields)) {
-            $updates = [];
-            $needed_vars = [];
+        foreach ($lines as $line) {
+            $unfuse_fields = [];
+            $data = [];
+            $statements = [];
+            $ids = [];
+            $oldline = @$line->id ? $oldlines[$line->id] : null;
 
-            foreach ($unfuse_fields as $field => $expression) {
-                $updates[] = "{$field} = {$expression}";
-                preg_match_all('/:([a-z_]+)/', $expression, $matches);
+            $this->save_r('t', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids);
+
+            foreach ($statements as $statement) {
+                @list($query, $querydata, $saveto) = $statement;
+
+                preg_match_all('/:([a-z_]+_id)/', $query, $matches);
 
                 for ($i = 0; $i < count($matches[1]); $i++) {
-                    $needed_vars[] = $matches[1][$i];
-                }
-            }
-
-            sort($needed_vars);
-            $needed_vars = array_unique($needed_vars);
-
-            $joins = [];
-            $selects = []; // ignore
-
-            $this->find_r('t', $selects, $joins);
-
-            $join = implode(' ', $joins);
-            $set = implode(', ', $updates);
-
-            $query = "update {$dbtable} t {$join} set {$set} where t.id = :id";
-            $stmt = Db::prepare($query);
-
-            $querydata = ['id' => $line->id];
-
-            foreach ($needed_vars as $nv) {
-                $querydata[$nv] = $data[$nv] ?: null;
-            }
-
-            $result = $stmt->execute($querydata);
-
-            if (!$result) {
-                error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
-            }
-        }
-
-        if (@$line) {
-            $line->id = $ids['t_id'];
-
-            if (@$line->parent) {
-                if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
-                    error_response('Invalid parent specification');
+                    $querydata[$matches[1][$i]] = $ids[$matches[1][$i]];
                 }
 
-                $parentlink = Tablelink::load($groups[1]);
-                $parentside = @array_flip($parentlink->ids)[$groups[2]];
-                $childside = ($parentside + 1) % 2;
-                $parentid = intval($groups[3]);
-
-                $query = "insert into {$parentlink->middle_table} ({$parentlink->ids[$parentside]}_id, {$parentlink->ids[$childside]}_id) values (:parentid, :lineid) on duplicate key update {$parentlink->ids[$parentside]}_id = :parentid, {$parentlink->ids[$childside]}_id = :lineid";
-                $querydata = [
-                    'parentid' => $parentid,
-                    'lineid' => $line->id
-                ];
                 $stmt = Db::prepare($query);
+                $result = $stmt->execute($querydata);
+
+                if (!$result) {
+                    error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                }
+
+                if ($saveto) {
+                    $ids[$saveto] = Db::pdo_insert_id();
+                }
+            }
+
+            if (count($unfuse_fields)) {
+                $updates = [];
+                $needed_vars = [];
+
+                foreach ($unfuse_fields as $field => $expression) {
+                    $updates[] = "{$field} = {$expression}";
+                    preg_match_all('/:([a-z_]+)/', $expression, $matches);
+
+                    for ($i = 0; $i < count($matches[1]); $i++) {
+                        $needed_vars[] = $matches[1][$i];
+                    }
+                }
+
+                sort($needed_vars);
+                $needed_vars = array_unique($needed_vars);
+
+                $joins = [];
+                $selects = []; // ignore
+
+                $this->find_r('t', $selects, $joins);
+
+                $join = implode(' ', $joins);
+                $set = implode(', ', $updates);
+
+                $query = "update {$dbtable} t {$join} set {$set} where t.id = :id";
+                $stmt = Db::prepare($query);
+
+                $querydata = ['id' => $line->id];
+
+                foreach ($needed_vars as $nv) {
+                    $querydata[$nv] = $data[$nv] ?: null;
+                }
+
                 $result = $stmt->execute($querydata);
 
                 if (!$result) {
@@ -275,40 +218,68 @@ class Linetype
                 }
             }
 
-            if (@$this->printonsave) {
-                print_line($this, $line, load_children($this, $line));
+            if (@$line) {
+                $line->id = $ids['t_id'];
+
+                if (@$line->parent) {
+                    if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
+                        error_response('Invalid parent specification');
+                    }
+
+                    $parentlink = Tablelink::load($groups[1]);
+                    $parentside = @array_flip($parentlink->ids)[$groups[2]];
+                    $childside = ($parentside + 1) % 2;
+                    $parentid = intval($groups[3]);
+
+                    $query = "insert into {$parentlink->middle_table} ({$parentlink->ids[$parentside]}_id, {$parentlink->ids[$childside]}_id) values (:parentid, :lineid) on duplicate key update {$parentlink->ids[$parentside]}_id = :parentid, {$parentlink->ids[$childside]}_id = :lineid";
+                    $querydata = [
+                        'parentid' => $parentid,
+                        'lineid' => $line->id
+                    ];
+                    $stmt = Db::prepare($query);
+                    $result = $stmt->execute($querydata);
+
+                    if (!$result) {
+                        error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                    }
+                }
+
+                if (@$this->printonsave) {
+                    print_line($this, $line, load_children($this, $line));
+                }
             }
         }
 
-        return $line;
+        return $lines;
     }
 
-    public static function suggested($name)
+    public function unlink($lines)
     {
-        $linetype = Linetype::load($name);
-        return $linetype->get_suggested_values();
-    }
+        foreach ($lines as $line) {
+            $id = $line->id;
 
-    public static function unlink($name, $id, $parentname, $parentid)
-    {
-        $linetype = Linetype::load($name);
-        $parentlinetype = Linetype::load($parentname);
+            if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
+                error_response('Invalid parent specification');
+            }
 
-        $tablelink = null;
+            $tablelink = Tablelink::load($groups[1]);
+            $parentside = @array_flip($tablelink->ids)[$groups[2]];
+            $childside = ($parentside + 1) % 2;
+            $parentid = intval($groups[3]);
 
-        foreach ($parentlinetype->children as $child) {
-            if ($child->linetype == $linetype->name) {
-                $tablelink = Tablelink::load($child->parent_link);
+            $query = "delete from {$tablelink->middle_table} where {$tablelink->ids[$parentside]}_id = :parentid and {$tablelink->ids[$childside]}_id = :lineid";
+            $querydata = [
+                'parentid' => $parentid,
+                'lineid' => $line->id,
+            ];
 
-                break;
+            $stmt = Db::prepare($query);
+            $result = $stmt->execute($querydata);
+
+            if (!$result) {
+                error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
             }
         }
-
-        if (!$tablelink) {
-            error_response('Could not find the table link');
-        }
-
-        unlink_record($id, $parentid, $tablelink);
     }
 
     public function build_class_field_fuse($fieldname)
@@ -322,12 +293,8 @@ class Linetype
         $field->fuse = "if ((" . implode(') or (', $field->clauses) . "), '{$fieldname}', '')";
     }
 
-    public function find_lines($filters = null, $parentId = null, $parentLink = null, $customClause = null, $summary = false)
+    public function find_lines($filters = null, $parentId = null, $parentLink = null, $summary = false)
     {
-        if ($customClause) {
-            error_response("Linetype::find_lines argument customClause is deprecated");
-        }
-
         $filters = $filters ?? [];
 
         $dbtable = @Config::get()->tables[$this->table];
@@ -746,5 +713,100 @@ class Linetype
             $querydata = ['oldlineid' => $oldline->id];
             $statements[] = [$q, $querydata];
         }
+    }
+
+    public function load_children($line)
+    {
+        $sets = [];
+
+        foreach ($this->children as $child) {
+            $sets[] = $this->load_childset($line, $child);
+        }
+
+        return $sets;
+    }
+
+    function load_childset($line, $descriptor)
+    {
+        $child_linetype = Linetype::load(@$descriptor->linetype);
+        $fields = $child_linetype->fields;
+
+        $line->{$descriptor->label} = $child_linetype->find_lines(null, $line->id, $descriptor->parent_link);
+
+        if (filter_objects($child_linetype->fields, 'summary', 'is', 'sum')) {
+            $line->{"{$descriptor->label}_summary"} = $child_linetype->find_lines(null, $line->id, $descriptor->parent_link, true);
+        }
+
+        return $line->{$descriptor->label};
+    }
+
+    function filter_filters($filters, $fields)
+    {
+        $r = [];
+
+        foreach ($filters as $filter) {
+            $filter = clone $filter;
+
+            if ($filter->field == 'deepid') {
+                $filter->field = 'id';
+                $ids = [];
+
+                foreach ((is_array($filter->value) ? $filter->value : [$filter->value]) as $deepid) {
+                    $parts = explode(':', $deepid);
+                    $type = $parts[0];
+                    $id = $parts[1];
+
+                    if ($type == $this->name) {
+                        $ids[] = $id;
+                    }
+                }
+
+                if (!count($ids)) {
+                    return false;
+                }
+
+                $filter->value = $ids;
+            }
+
+            if ($filter->field == 'id') {
+                $r[] = $filter;
+                continue;
+            }
+
+            $linetype_field = @array_values(array_filter($this->fields, function ($v) use ($filter) {
+                return $v->name == $filter->field;
+            }))[0];
+
+            if ($linetype_field) {
+                $r[] = $filter;
+                continue;
+            }
+
+            // can't find the field, apply default
+
+            $field = @array_values(array_filter($fields, function ($v) use ($filter) {
+                return $v->name == $filter->field;
+            }))[0];
+
+            if (!is_object($field)) {
+                error_response("Filter refers to non-existent field {$filter->field} in linetype {$this->name}");
+            }
+
+            if (
+                $filter->cmp == '=' && (
+                    is_array($filter->value) && !in_array($field->default, $filter->value)
+                    ||
+                    !is_array($filter->value) && $field->default != $filter->value
+                )
+                ||
+                $filter->cmp == 'like' && !preg_match('/' . str_replace('%', '.*', $filter->value) . '/i', $field->default)
+                ||
+                $filter->cmp == 'custom' && !($filter->cmp->php)($field->default)
+            ) {
+                return false;
+            }
+        }
+
+        return $r;
     }
 }

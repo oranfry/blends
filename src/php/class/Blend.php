@@ -24,14 +24,11 @@ class Blend
         return $blend;
     }
 
-    public static function delete($name, $filters)
+    public function delete($filters)
     {
-        $blend = Blend::load($name);
-
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
-        }, $blend->linetypes);
-        $fields = $blend->fields;
+        }, $this->linetypes);
 
         $numQueries = 0;
         $affected = 0;
@@ -39,147 +36,30 @@ class Blend
         $linkDeletes = [];
 
         foreach ($linetypes as $linetype) {
-            $_filters = filter_filters($filters, $linetype, $fields);
+            $_filters = $linetype->filter_filters($filters, $this->fields);
 
             if ($_filters === false) {
                 continue;
             }
 
-            $linetype_db_table = Table::load($linetype->table)->table;
-
-            list(, , $filterClauses) = lines_prepare_search($linetype, $_filters);
-
-            $allLinks = array_merge(
-                collect_inline_links($linetype->name),
-                array_map(function($c){
-                    return (object)['linetype' => $c->linetype, 'tablelink' => $c->parent_link, 'alias' => $c->label];
-                }, $linetype->children ?: [])
-            );
-
-            $joinClauses = [];
-            $idfields = [];
-
-            foreach ($allLinks as $_link) {
-                $side = 1;
-
-                if (@$_link->reverse) {
-                    $side = 0;
-                }
-
-                $otherside = ($side + 1) % 2;
-
-                $tablelink = Tablelink::load($_link->tablelink);
-                $assocdbtable = Table::load($tablelink->tables[$side])->table;
-                $alias = @$_link->alias ?: $tablelink->ids[$side];
-
-                $joinClauses[] = "left join {$tablelink->middle_table} {$alias}_m on {$alias}_m.{$tablelink->ids[$otherside]}_id = t.id";
-                $joinClauses[] = "left join {$assocdbtable} {$alias} on {$alias}.id = {$alias}_m.{$tablelink->ids[$side]}_id";
-                $idfields[] = "{$alias}_m.{$tablelink->ids[0]}_id {$tablelink->ids[0]}_id";
-                $idfields[] = "{$alias}_m.{$tablelink->ids[1]}_id {$tablelink->ids[1]}_id";
-            }
-
-            $selectClause = implode(', ', array_merge(['t.id id'], $idfields));
-            $joinClause = implode(' ', $joinClauses);
-            $whereClause = implode(' and ', array_merge($filterClauses, array_map(function($c){ return "({$c})"; }, @$linetype->clauses ?? []))) ?: '1';
-
-            $q = "select {$selectClause} from {$linetype_db_table} t {$joinClause} where {$whereClause}";
-
-            $result = DB::succeed($q);
-
-            $numQueries++;
-
-            while ($row = mysqli_fetch_assoc($result)) {
-                @$recordDeletes[$linetype_db_table][] = $row['id'];
-
-                $reverse = @$linetype->links_reversed ?: [];
-
-                foreach ($allLinks as $_link) {
-                    $tablelink = Tablelink::load($_link->tablelink);
-
-                    $side = 0;
-
-                    if (@$_link->$reverse) {
-                        $side = 1;
-                    }
-
-                    $otherside = ($side + 1) % 2;
-
-                    $associd = $row["{$tablelink->ids[$otherside]}_id"];
-
-                    if ($associd === null) {
-                        continue;
-                    }
-
-                    $assocdbtable = Table::load($tablelink->tables[$otherside])->table;
-                    @$recordDeletes[$assocdbtable][] = $associd;
-
-                    @$linkDeletes[$tablelink->middle_table][] = [
-                        "{$tablelink->ids[$side]}_id" => $row['id'],
-                        "{$tablelink->ids[$otherside]}_id" => $associd,
-                    ];
-                }
-            }
+            $linetype->delete($_filters);
         }
-
-        $numQueries = 0;
-        $affectedLinks = 0;
-        $affectedRecords = 0;
-        $starttime = (string) microtime(true);
-
-        foreach ($linkDeletes as $dbtable => $deletes) {
-            $linkDeleteClauses = array_map(function ($delete) {
-                return implode(' and ', array_map(function ($field, $id) {
-                    return "$field = $id";
-                }, array_keys($delete), $delete));
-            }, $deletes);
-
-            $linkDeleteClause = implode(' or ', $linkDeleteClauses);
-
-            $q = "delete from {$dbtable} where {$linkDeleteClause}";
-
-            $result = Db::succeed($q);
-
-            $affectedLinks += Db::affected();
-            $numQueries++;
-        }
-
-        foreach ($recordDeletes as $dbtable => $deletes) {
-            $recordDeleteClause = implode(', ', $deletes);
-
-            $q = "delete from {$dbtable} where id in ($recordDeleteClause)";
-
-            $result = Db::succeed($q);
-
-            $affectedRecords += Db::affected();
-            $numQueries++;
-        }
-
-        $duration = bcsub((string) microtime(true), $starttime, 4);
-
-        return [
-            $numQueries,
-            $duration,
-            $affectedRecords,
-            $affectedLinks,
-        ];
     }
 
-    public static function search($name, $filters)
+    public function search($filters)
     {
-        $blend = Blend::load($name);
-
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
-        }, $blend->linetypes);
+        }, $this->linetypes);
 
-        if (@$blend->groupby) {
-            $groupfield = $blend->groupby;
+        if (@$this->groupby) {
+            $groupfield = $this->groupby;
         }
 
         $records = [];
 
         foreach ($linetypes as $linetype) {
-            $_filters = filter_filters($filters, $linetype, $blend->fields);
+            $_filters = $linetype->filter_filters($filters, $this->fields);
 
             if ($_filters === false) {
                 continue;
@@ -188,9 +68,9 @@ class Blend
             $_records = $linetype->find_lines($_filters);
 
             foreach ($_records as $record) {
-                $record->type = @$blend->hide_types[$linetype->name] ?: $linetype->name;
+                $record->type = @$this->hide_types[$linetype->name] ?: $linetype->name;
 
-                foreach ($blend->fields as $field) {
+                foreach ($this->fields as $field) {
                     if (!property_exists($record, $field->name)) {
                         if (!property_exists($field, 'default')) {
                             error_response("Blend field {$field->name} requires a default value");
@@ -205,7 +85,7 @@ class Blend
         }
 
         if ($groupfield) {
-            $groupby_field = @filter_objects($blend->fields, 'name', 'is', $groupfield)[0];
+            $groupby_field = @filter_objects($this->fields, 'name', 'is', $groupfield)[0];
 
             if ($groupby_field) {
                 usort($records, function ($a, $b) use ($groupby_field) {
@@ -233,51 +113,26 @@ class Blend
         return  $records;
     }
 
-    public static function info($name)
+    public function print($filters)
     {
-        return Blend::load($name);
-    }
-
-    public static function list()
-    {
-        $blends = [];
-
-        foreach (array_keys(Config::get()->blends) as $name) {
-            $blends[] = Blend::load($name);
-        }
-
-        return $blends;
-    }
-
-    public static function print($name, $filters)
-    {
-        $blend = Blend::load($name);
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
-        }, $blend->linetypes);
-        $fields = $blend->fields;
+        }, $this->linetypes);
 
         foreach ($linetypes as $linetype) {
-            $_filters = filter_filters($filters, $linetype, $fields);
+            $_filters = $linetype->filter_filters($filters, $this->fields);
 
             if ($_filters === false) {
                 continue;
             }
 
-            $lines = $linetype->find_lines($_filters);
-
-            foreach ($lines as $line) {
-                $children = load_children($linetype, $line);
-
-                print_line($linetype, $line, $children);
-            }
+            $linetype->print($_filters);
         }
     }
 
-    public static function summary($name, $filters)
+    public function summary($filters)
     {
-        $blend = Blend::load($name);
-        $summary_fields = filter_objects($blend->fields, 'summary', 'is', 'sum');
+        $summary_fields = filter_objects($this->fields, 'summary', 'is', 'sum');
 
         if (!count($summary_fields)) {
             return [];
@@ -285,7 +140,7 @@ class Blend
 
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
-        }, $blend->linetypes);
+        }, $this->linetypes);
 
         $balances = (object) [];
 
@@ -298,7 +153,7 @@ class Blend
 
             foreach ($filters as $filter) {
                 $linetype_field = @filter_objects($linetype->fields, 'name', 'is', $filter->field)[0];
-                $field = @filter_objects($blend->fields, 'name', 'is', $filter->field)[0];
+                $field = @filter_objects($this->fields, 'name', 'is', $filter->field)[0];
 
                 if ($linetype_field) {
                     $linetype_filters[] = $filter;
@@ -311,7 +166,7 @@ class Blend
                 }
             }
 
-            $summary = $linetype->find_lines($linetype_filters, null, null, null, true);
+            $summary = $linetype->find_lines($linetype_filters, null, null, true);
 
             foreach ($summary_fields as $field) {
                 $balances->{$field->name} = bcadd($balances->{$field->name}, @$summary->{$field->name} ?? '0.00', 2);
@@ -321,56 +176,25 @@ class Blend
         return $balances;
     }
 
-    public static function update($name, $filters, $data)
+    public function update($filters, $data)
     {
-        $blend = Blend::load($name);
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
-        }, $blend->linetypes);
-        $fields = $blend->fields;
-
-        $invalids = [];
-        $ids = [];
+        }, $this->linetypes);
 
         foreach ($linetypes as $linetype) {
-            $_filters = filter_filters($filters, $linetype, $fields);
+            $_filters = $linetype->filter_filters($filters, $this->fields);
 
             if ($_filters === false) {
                 continue;
             }
-
-            $linetype_db_table = Table::load($linetype->table)->table;
-            $updates = [];
-            $needed_vars = [];
-
-            foreach ($linetype->unfuse_fields as $field => $expression) {
-                $updates[] = "{$field} = {$expression}";
-                preg_match_all('/:([a-z]+)/', $expression, $matches);
-
-                for ($i = 0; $i < count($matches[1]); $i++) {
-                    $needed_vars[] = $matches[1][$i];
-                }
-            }
-
-            list($joinClauses, $orderbys, $filterClauses, $parentClauses, $linetypeClauses, $joinTables) = lines_prepare_search($linetype);
-
-            $joinClause = implode(' ', $joinClauses);
-            $orderByClause = implode(', ', $orderbys);
-            $fieldsClause = implode(', ', array_map(function ($v) {
-                return "{$v->fuse} `{$v->name}`";
-            }, $linetype->fields));
-            $updatesClause = implode(', ', $updates);
-            $joinTablesClause = implode(', ', $joinTables);
-
-            $q = "update {$linetype_db_table} t {$joinClause} set {$updatesClause} where t.id = :id";
-            $stmt = Db::prepare($q);
 
             $lines = $linetype->find_lines($_filters);
 
             foreach ($lines as $line) {
                 foreach ($linetype->fields as $field) {
                     if (property_exists($data, $field->name)) {
-                        $line->{$field->name} = $data->{$field->name} ?: null;
+                        $line->{$field->name} = $data->{$field->name};
                     }
                 }
 
@@ -378,29 +202,11 @@ class Blend
                 $errors = $linetype->validate($line);
 
                 if (count($errors)) {
-                    $invalids[] = implode(', ', $errors);
-
-                    continue;
+                    error_response("{$linetype->name} {$line->id} is invalid:" . implode(', ', $errors));
                 }
-
-                $linedata = ['id' => $line->id];
-
-                foreach ($needed_vars as $nv) {
-                    $linedata[$nv] = $line->{$nv};
-                }
-
-                $result = $stmt->execute($linedata);
-
-                if (!$result) {
-                    $error = "Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}\n" . print_r($linedata, true);
-
-                    return;
-                }
-
-                $ids[] = "{$linetype->name}({$line->id})";
             }
-        }
 
-        return $ids;
+            $linetype->save($lines);
+        }
     }
 }

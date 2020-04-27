@@ -18,8 +18,12 @@ class Repeater
     static function create($serialised)
     {
         if (!preg_match('/^(?:(day):([0-9]{4}-[0-9]{2}-[0-9]{2})\.(\d+)|(month):(\d+)|(year):(\d+)\/(\d+))(r)?(?:f(\d))?(?:([+-])(\d+)([dwmy]))?$/', $serialised, $groups)) {
+            //                1     2                             3     4       5     6      7      8     9       10       11    12    13
             error_response('invalid repeater: ' . $serialised);
         }
+
+        unset($groups[0]);
+        kayoh_dump($groups);
 
         $pegdate = null;
         $n = null;
@@ -30,7 +34,7 @@ class Repeater
         $offsetMagnitude = null;
         $offsetPeriod = null;
 
-        $period = $groups[1] . $groups[4] . $groups[6];
+        $period = @$groups[1] . @$groups[4] . @$groups[6];
 
         if ($period == 'day') {
             $pegdate = $groups[2];
@@ -42,10 +46,10 @@ class Repeater
             $month = $groups[8];
         }
 
-        $round = (bool) $groups[9];
-        $ff = $groups[10] ?: null;
+        $round = (bool) @$groups[9];
+        $ff = @$groups[10];
 
-        if ($groups[11]) {
+        if (@$groups[11]) {
             $offsetSign = $groups[11];
             $offsetMagnitude = $groups[12];
             $offsetPeriod = ['d' => 'day', 'w' => 'week', 'm' => 'month', 'y' => 'year',][$groups[13]];
