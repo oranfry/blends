@@ -223,7 +223,7 @@ class Linetype
 
                 if (@$line->parent) {
                     if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
-                        error_response('Invalid parent specification');
+                        error_response('Invalid parent specification: ' . $line->parent);
                     }
 
                     $parentlink = Tablelink::load($groups[1]);
