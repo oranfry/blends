@@ -13,6 +13,12 @@ class LinetypeHelper
             $pos = count($linetype->fields);
         }
 
+        $existingpos = array_search($field, $linetype->fields);
+
+        if ($existingpos !== false) {
+            array_splice($linetype->fields, $existingpos, 1);
+        }
+
         array_splice($linetype->fields, $pos, 0, [$field]);
     }
 
