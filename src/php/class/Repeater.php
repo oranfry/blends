@@ -17,8 +17,8 @@ class Repeater
 
     static function create($serialised)
     {
+        //                    1     2                             3     4       5     6      7      8     9       10       11    12    13
         if (!preg_match('/^(?:(day):([0-9]{4}-[0-9]{2}-[0-9]{2})\.(\d+)|(month):(\d+)|(year):(\d+)\/(\d+))(r)?(?:f(\d))?(?:([+-])(\d+)([dwmy]))?$/', $serialised, $groups)) {
-            //                1     2                             3     4       5     6      7      8     9       10       11    12    13
             error_response('invalid repeater: ' . $serialised);
         }
 
