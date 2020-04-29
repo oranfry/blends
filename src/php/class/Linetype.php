@@ -221,6 +221,8 @@ class Linetype
             if (@$line) {
                 $line->id = $ids['t_id'];
 
+                $this->upload_r($line);
+
                 if (@$line->parent) {
                     if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
                         error_response('Invalid parent specification: ' . $line->parent);
@@ -605,9 +607,7 @@ class Linetype
             }
 
             foreach ($this->fields as $field) {
-                if ($field->type == 'file' && @$line->{$field->name}) {
-                    $this->handle_upload($field, $line);
-                } else {
+                if ($field->type != 'file') {
                     $data["{$alias}_{$field->name}"] = @$line->{$field->name};
                 }
             }
@@ -729,6 +729,35 @@ class Linetype
             $q = "delete from {$dbtable} where id = :oldlineid";
             $querydata = ['oldlineid' => $oldline->id];
             $statements[] = [$q, $querydata];
+        }
+    }
+
+    private function upload_r($line)
+    {
+        foreach ($this->fields as $field) {
+            if ($field->type == 'file' && @$line->{$field->name}) {
+                $this->handle_upload($field, $line);
+            }
+        }
+
+        foreach (@$this->inlinelinks ?? [] as $child) {
+            if (@$child->norecurse) {
+                continue;
+            }
+
+            $childtablelink = Tablelink::load($child->tablelink);
+
+            if (@$child->reverse) {
+                $childtablelink = $childtablelink->reverse();
+            }
+
+            $childlinetype = Linetype::load($child->linetype);
+            $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
+            $childline = @$line->{$childaliasshort};
+
+            if ($childline) {
+                $childlinetype->upload_r($childline);
+            }
         }
     }
 
