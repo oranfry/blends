@@ -696,6 +696,15 @@ class Linetype
         }
 
         if ($was && !$is) {
+            foreach ($this->fields as $field) {
+                if ($field->type == 'file') {
+                    $filepath = FILES_HOME . '/' . ($field->path)($oldline);
+                    if (file_exists($filepath)) {
+                        unlink($filepath);
+                    }
+                }
+            }
+
             foreach (@$this->children ?? [] as $child) {
                 if (@$child->ondelete == 'orphan') {
                     continue;
