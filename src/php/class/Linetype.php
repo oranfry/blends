@@ -551,8 +551,13 @@ class Linetype
 
     private function handle_upload($field, $line)
     {
-        $filepath = FILES_HOME . '/' . ($field->path)($line);
-        $result = base64_decode($line->{$field->name});
+        if (!$line->{"{$field->name}_upload"}) {
+            return; // nothing uploaded
+        }
+
+        $shortpath = ($field->path)($line);
+        $filepath = FILES_HOME . '/' . $shortpath;
+        $result = base64_decode($line->{"{$field->name}_upload"});
 
         if ($result === false) {
             return;
@@ -581,6 +586,9 @@ class Linetype
         }
 
         file_put_contents($filepath, $result);
+        unset($line->{"{$field->name}_upload"});
+
+        $line->{$field->name} = $shortpath;
     }
 
     private function save_r($alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids)
@@ -735,7 +743,7 @@ class Linetype
     private function upload_r($line)
     {
         foreach ($this->fields as $field) {
-            if ($field->type == 'file' && @$line->{$field->name}) {
+            if ($field->type == 'file') {
                 $this->handle_upload($field, $line);
             }
         }
