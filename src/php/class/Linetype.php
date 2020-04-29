@@ -611,7 +611,7 @@ class Linetype
             $this->unpack($line);
 
             if (count($errors)) {
-                error_response("Invalid {$this->name}: "  . implode(', ', $errors));
+                error_response("Invalid {$this->name} ({$alias}): "  . implode(', ', $errors));
             }
 
             foreach ($this->fields as $field) {
