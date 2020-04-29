@@ -377,11 +377,6 @@ class Linetype
 
             $line->type = $this->name;
 
-            if ($parentId) {
-                $line->parent = $parentId;
-                $line->parent_link = $parentLink;
-            }
-
             $this->build_r('t', $row, $line, $summary);
 
             if ($summary) {
@@ -701,6 +696,21 @@ class Linetype
         }
 
         if ($was && !$is) {
+            foreach (@$this->children ?? [] as $child) {
+                if (@$child->ondelete == 'orphan') {
+                    continue;
+                }
+
+                $childlinetype = Linetype::load($child->linetype);
+                $childlines = $childlinetype->find_lines(null, $line->id, $child->parent_link);
+
+                foreach ($childlines as $childline) {
+                    $childline->_is = false;
+                }
+
+                $childlinetype->save($childlines);
+            }
+
             if ($tablelink) {
                 $q = "delete from {$tablelink->middle_table} where {$tablelink->ids[0]}_id = :{$parentalias}_id and {$tablelink->ids[1]}_id = :oldlineid";
                 $querydata = ['oldlineid' => $oldline->id];
