@@ -551,7 +551,7 @@ class Linetype
 
     private function handle_upload($field, $line)
     {
-        if (!@$line->{"{$field->name}_upload"} && @$line->{"{$field->name}_delete"} !== true) {
+        if (!@$line->{"{$field->name}_upload"} && !@$line->{"{$field->name}_delete"}) {
             return; // no changes
         }
 
