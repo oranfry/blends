@@ -196,6 +196,16 @@ class Blend
                     if (property_exists($data, $field->name)) {
                         $line->{$field->name} = $data->{$field->name};
                     }
+
+                    if ($field->type == 'file') {
+                        if (property_exists($data, $field->name . '_upload')) {
+                            $line->{"{$field->name}_upload"} = $data->{"{$field->name}_upload"};
+                        }
+
+                        if (property_exists($data, $field->name . '_delete')) {
+                            $line->{"{$field->name}_delete"} = $data->{"{$field->name}_delete"};
+                        }
+                    }
                 }
 
                 $linetype->complete($line);
