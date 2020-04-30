@@ -81,6 +81,31 @@ class Linetype
         return null;
     }
 
+    public function aspdf($line)
+    {
+        $cmd = "/usr/bin/xvfb-run -- /usr/bin/wkhtmltopdf -s A4 - -";
+        $descriptorspec = [
+           ['pipe', 'r'],
+           ['pipe', 'w'],
+        ];
+
+        $process = proc_open($cmd, $descriptorspec, $pipes, '/tmp');
+
+        if (!is_resource($process)) {
+            error_response('Failed to create pdf (1)');
+        }
+
+        fwrite($pipes[0], $this->ashtml($line));
+        fclose($pipes[0]);
+
+        $filedata = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+
+        $return_value = proc_close($process);
+
+        return $filedata;
+    }
+
     public function delete($filters)
     {
         $oldlines = $this->find_lines($filters);
@@ -440,7 +465,7 @@ class Linetype
             }
 
             if (!$summary && $field->type == 'file' && defined('FILES_HOME')) {
-                $path = ($field->path)($line);
+                $path = $this->file_path($line, $field);
                 $file = FILES_HOME . '/' . $path;
 
                 if (file_exists($file)) {
@@ -551,60 +576,39 @@ class Linetype
 
     private function handle_upload($field, $line)
     {
-        if (!@$line->{"{$field->name}_upload"} && !@$line->{"{$field->name}_delete"}) {
-            return; // no changes
-        }
-
-        $shortpath = ($field->path)($line);
-        $filepath = FILES_HOME . '/' . $shortpath;
-        $dirs = [];
-
-        for ($parent = dirname($shortpath); $parent != '.'; $parent = dirname($parent)) {
-            array_unshift($dirs, FILES_HOME . '/' . $parent);
-        }
-
         if (@$line->{"{$field->name}_upload"}) {
-            $result = base64_decode($line->{"{$field->name}_upload"});
+            if (@$field->generate_only) {
+                error_response("File field {$this->name}.{$field->name} marked as generate only");
+            }
 
-            if ($result === false) {
-                return;
+            $filedata = base64_decode($line->{"{$field->name}_upload"});
+
+            if ($filedata === false) {
+                error_response("Failed to base64 decode the uploaded file");
             }
 
             if (@$field->mimetype) {
                 $finfo = new finfo(FILEINFO_MIME_TYPE);
 
-                if ($finfo->buffer($result) !== $field->mimetype) {
-                    return;
+                if ($finfo->buffer($filedata) !== $field->mimetype) {
+                    error_response("Uploaded file is of the wrong type");
                 }
             }
 
-            @mkdir(FILES_HOME);
-
-            foreach ($dirs as $dir) {
-                @mkdir($dir);
+            $this->save_file($line, $field, $filedata);
+        } elseif (@$line->{"{$field->name}_generate"}) {
+            if (!@$field->generable) {
+                error_response("File field {$this->name}.{$field->name} not marked as generable");
             }
 
-            if (!is_dir(dirname($filepath))) {
-                error_response("Failed to create intermediate directories");
-            }
+            $this->load_children($line);
+            $filedata = $this->aspdf($line);
 
-            file_put_contents($filepath, $result);
-
-            if (!file_exists($filepath)) {
-                error_response("Failed to create the file for field {$field->name}");
-            }
-
-            $line->{$field->name} = $shortpath;
+            $this->save_file($line, $field, $filedata);
+        } elseif (@$line->{"{$field->name}_delete"}) {
+            $this->delete_file($line, $field);
         } else {
-            unlink($filepath);
-
-            foreach (array_reverse($dirs) as $dir) {
-                if (dir_is_empty($dir)) {
-                    rmdir($dir);
-                }
-            }
-
-            $line->{$field->name} = null;
+            return; //nothing to do
         }
 
         unset($line->{"{$field->name}_upload"});
@@ -726,10 +730,7 @@ class Linetype
         if ($was && !$is) {
             foreach ($this->fields as $field) {
                 if ($field->type == 'file') {
-                    $filepath = FILES_HOME . '/' . ($field->path)($oldline);
-                    if (file_exists($filepath)) {
-                        unlink($filepath);
-                    }
+                    $this->delete_file($line, $field);
                 }
             }
 
@@ -800,7 +801,7 @@ class Linetype
         return $sets;
     }
 
-    function load_childset($line, $descriptor)
+    public function load_childset($line, $descriptor)
     {
         $child_linetype = Linetype::load(@$descriptor->linetype);
         $fields = $child_linetype->fields;
@@ -814,7 +815,7 @@ class Linetype
         return $line->{$descriptor->label};
     }
 
-    function filter_filters($filters, $fields)
+    public function filter_filters($filters, $fields)
     {
         $r = [];
 
@@ -882,5 +883,69 @@ class Linetype
         }
 
         return $r;
+    }
+
+    private function file_path($line, $field)
+    {
+        if (!@$field->prefix) {
+            error_response("No prefix defined for file field {$this->name}.{$field->name}");
+        }
+
+        $hash = md5($field->prefix . ':' . $line->id);
+        $intermediate = substr($hash, 0, 3);
+
+        return "{$field->prefix}/{$intermediate}/{$line->id}.pdf";
+    }
+
+    private function delete_file($line, $field)
+    {
+        $shortpath = $this->file_path($line, $field);
+        $filepath = FILES_HOME . '/' . $shortpath;
+        $dirs = [];
+
+        for ($parent = dirname($shortpath); $parent != '.'; $parent = dirname($parent)) {
+            array_unshift($dirs, FILES_HOME . '/' . $parent);
+        }
+
+        if (file_exists($filepath)) {
+            unlink($filepath);
+        }
+
+        foreach (array_reverse($dirs) as $dir) {
+            if (dir_is_empty($dir)) {
+                rmdir($dir);
+            }
+        }
+
+        $line->{$field->name} = null;
+    }
+
+    private function save_file($line, $field, $filedata)
+    {
+        $shortpath = $this->file_path($line, $field);
+        $filepath = FILES_HOME . '/' . $shortpath;
+        $dirs = [];
+
+        for ($parent = dirname($shortpath); $parent != '.'; $parent = dirname($parent)) {
+            array_unshift($dirs, FILES_HOME . '/' . $parent);
+        }
+
+        @mkdir(FILES_HOME);
+
+        foreach ($dirs as $dir) {
+            @mkdir($dir);
+        }
+
+        if (!is_dir(dirname($filepath))) {
+            error_response("Failed to create intermediate directories");
+        }
+
+        file_put_contents($filepath, $filedata);
+
+        if (!file_exists($filepath)) {
+            error_response("Failed to create the file for field {$field->name}");
+        }
+
+        $line->{$field->name} = $shortpath;
     }
 }
