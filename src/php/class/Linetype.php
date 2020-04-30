@@ -551,44 +551,64 @@ class Linetype
 
     private function handle_upload($field, $line)
     {
-        if (!$line->{"{$field->name}_upload"}) {
-            return; // nothing uploaded
+        if (!@$line->{"{$field->name}_upload"} && @$line->{"{$field->name}_delete"} !== true) {
+            return; // no changes
         }
 
         $shortpath = ($field->path)($line);
         $filepath = FILES_HOME . '/' . $shortpath;
-        $result = base64_decode($line->{"{$field->name}_upload"});
+        $dirs = [];
 
-        if ($result === false) {
-            return;
+        for ($parent = dirname($shortpath); $parent != '.'; $parent = dirname($parent)) {
+            array_unshift($dirs, FILES_HOME . '/' . $parent);
         }
 
-        if (@$field->mimetype) {
-            $finfo = new finfo(FILEINFO_MIME_TYPE);
+        if (@$line->{"{$field->name}_upload"}) {
+            $result = base64_decode($line->{"{$field->name}_upload"});
 
-            if ($finfo->buffer($result) !== $field->mimetype) {
+            if ($result === false) {
                 return;
             }
+
+            if (@$field->mimetype) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+
+                if ($finfo->buffer($result) !== $field->mimetype) {
+                    return;
+                }
+            }
+
+            @mkdir(FILES_HOME);
+
+            foreach ($dirs as $dir) {
+                @mkdir($dir);
+            }
+
+            if (!is_dir(dirname($filepath))) {
+                error_response("Failed to create intermediate directories");
+            }
+
+            file_put_contents($filepath, $result);
+
+            if (!file_exists($filepath)) {
+                error_response("Failed to create the file for field {$field->name}");
+            }
+
+            $line->{$field->name} = $shortpath;
+        } else {
+            unlink($filepath);
+
+            foreach (array_reverse($dirs) as $dir) {
+                if (dir_is_empty($dir)) {
+                    rmdir($dir);
+                }
+            }
+
+            $line->{$field->name} = null;
         }
 
-        $mkdirs = [];
-
-        for ($parent = dirname($filepath); !is_dir($parent); $parent = dirname($parent)) {
-            array_unshift($mkdirs, $parent);
-        }
-
-        foreach ($mkdirs as $dir) {
-            @mkdir($dir);
-        }
-
-        if (!is_dir(dirname($filepath))) {
-            return;
-        }
-
-        file_put_contents($filepath, $result);
         unset($line->{"{$field->name}_upload"});
-
-        $line->{$field->name} = $shortpath;
+        unset($line->{"{$field->name}_delete"});
     }
 
     private function save_r($alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids)

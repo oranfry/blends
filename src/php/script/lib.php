@@ -82,3 +82,20 @@ function get_file_info($name)
         'filename' => basename($name),
     ];
 }
+
+function dir_is_empty($dir)
+{
+    $handle = opendir($dir);
+
+    while (false !== ($entry = readdir($handle))) {
+        if ($entry == '.' || $entry == '..') {
+           continue;
+        }
+
+        closedir($handle);
+        return false;
+    }
+
+    closedir($handle);
+    return true;
+}
