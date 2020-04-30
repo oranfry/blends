@@ -887,14 +887,14 @@ class Linetype
 
     private function file_path($line, $field)
     {
-        if (!@$field->prefix) {
-            error_response("No prefix defined for file field {$this->name}.{$field->name}");
+        if (!@$field->path) {
+            error_response("No path defined for file field {$this->name}.{$field->name}");
         }
 
-        $hash = md5($field->prefix . ':' . $line->id);
+        $hash = md5($field->path . ':' . $line->id);
         $intermediate = substr($hash, 0, 3);
 
-        return "{$field->prefix}/{$intermediate}/{$line->id}.pdf";
+        return "{$field->path}/{$intermediate}/{$line->id}.pdf";
     }
 
     private function delete_file($line, $field)
