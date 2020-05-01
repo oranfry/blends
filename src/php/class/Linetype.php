@@ -73,12 +73,15 @@ class Linetype
 
     public function astext($line)
     {
-        return null;
     }
 
     public function ashtml($line)
     {
-        return null;
+        $text = $this->astext($line);
+
+        if ($text) {
+            return '<pre>' . $text . '</pre>';
+        }
     }
 
     public function aspdf($line)
