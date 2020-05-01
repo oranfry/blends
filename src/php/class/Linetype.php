@@ -643,7 +643,13 @@ class Linetype
 
             foreach ($this->fields as $field) {
                 if ($field->type != 'file') {
-                    $data["{$alias}_{$field->name}"] = @$line->{$field->name};
+                    if (!@$line->{$field->name}) {
+                        $value = null;
+                    } else {
+                        $value = $line->{$field->name};
+                    }
+
+                    $data["{$alias}_{$field->name}"] = $value;
                 }
             }
         }
