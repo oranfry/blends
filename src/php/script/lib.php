@@ -40,7 +40,7 @@ function get_sku_meta()
 }
 
 
-function get_values($table, $field, $clause = null)
+function get_values($table, $field, $clause = null, $label = null)
 {
     $values = [];
 
@@ -50,12 +50,18 @@ function get_values($table, $field, $clause = null)
         error_response("Could not resolve {$table} to a database table name");
     }
 
+    $labelselector = $label ? ", {$label}" : '';
+
     $and = $clause ? "and {$clause}" : '';
 
-    $r = Db::succeed("select `{$field}` from `{$db_table}` t where `{$field}` is not null and `{$field}` != '' {$and} group by `{$field}` order by `{$field}`");
+    $r = Db::succeed("select `{$field}` {$labelselector} from `{$db_table}` t where `{$field}` is not null and `{$field}` != '' {$and} group by `{$field}` {$labelselector} order by `{$field}`");
 
     while ($value = mysqli_fetch_row($r)) {
-        $values[] = $value[0];
+        if ($label) {
+            $values[$value[1]] = $value[0];
+        } else {
+            $values[] = $value[0];
+        }
     }
 
     return $values;
