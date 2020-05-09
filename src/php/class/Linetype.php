@@ -477,7 +477,6 @@ class Linetype
 
                 if (file_exists($file)) {
                     if ($load_files) {
-                        echo "{$file}\n";
                         $line->{$field->name} = base64_encode(file_get_contents($file));
                     } else {
                         $line->{"{$field->name}_path"} = $path;
