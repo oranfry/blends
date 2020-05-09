@@ -591,12 +591,12 @@ class Linetype
 
     private function handle_upload($field, $line)
     {
-        if (@$line->{"{$field->name}_upload"}) {
+        if (@$line->{$field->name}) {
             if (@$field->generate_only) {
                 error_response("File field {$this->name}.{$field->name} marked as generate only");
             }
 
-            $filedata = base64_decode($line->{"{$field->name}_upload"});
+            $filedata = base64_decode($line->{$field->name});
 
             if ($filedata === false) {
                 error_response("Failed to base64 decode the uploaded file");
@@ -626,7 +626,7 @@ class Linetype
             return; //nothing to do
         }
 
-        unset($line->{"{$field->name}_upload"});
+        unset($line->{$field->name});
         unset($line->{"{$field->name}_delete"});
     }
 
