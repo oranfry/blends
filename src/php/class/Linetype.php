@@ -168,7 +168,11 @@ class Linetype
         }
 
         $oldlines = [];
-        $oldids = array_filter(map_objects($lines, 'id'));
+        $oldids = [];
+
+        foreach ($lines as $i => $line) {
+            $oldids[$i] = @$line->id;
+        }
 
         if (count($oldids)) {
             foreach ($this->find_lines([(object)['field' => 'id', 'value' => $oldids]]) as $oldline) {
