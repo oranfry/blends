@@ -75,6 +75,23 @@ class Linetype
     {
     }
 
+    public function find_incoming_links()
+    {
+        $links = [];
+
+        foreach (Config::get()->linetypes as $name => $class) {
+            $linetype = Linetype::load($name);
+
+            foreach ($linetype->children as $child) {
+                if ($child->linetype == $this->name) {
+                    $links[] = $child;
+                }
+            }
+        }
+
+        return $links;
+    }
+
     public function ashtml($line)
     {
         $text = $this->astext($line);
@@ -255,26 +272,44 @@ class Linetype
 
                 $this->upload_r($line);
 
-                if (@$line->parent) {
-                    if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
-                        error_response('Invalid parent specification: ' . $line->parent);
+                foreach ($this->find_incoming_links() as $parent) {
+                    $tablelink = Tablelink::load($parent->parent_link);
+                    $parentside = @$parent->reverse ? 1 : 0;
+                    $childside = ($parentside + 1 % 2);
+
+                    $newparent = @$line->{$tablelink->ids[$parentside]};
+                    $oldparent = @$oldline->{$tablelink->ids[$parentside]};
+
+                    if ($newparent == $oldparent) {
+                        continue;
                     }
 
-                    $parentlink = Tablelink::load($groups[1]);
-                    $parentside = @array_flip($parentlink->ids)[$groups[2]];
-                    $childside = ($parentside + 1) % 2;
-                    $parentid = intval($groups[3]);
+                    if ($oldparent) {
+                        $query = "delete from {$tablelink->middle_table} where {$tablelink->ids[$parentside]}_id = :parentid and {$tablelink->ids[$childside]}_id = :lineid";
+                        $querydata = [
+                            'parentid' => $oldparent,
+                            'lineid' => $oldline->id
+                        ];
+                        $stmt = Db::prepare($query);
+                        $result = $stmt->execute($querydata);
 
-                    $query = "insert into {$parentlink->middle_table} ({$parentlink->ids[$parentside]}_id, {$parentlink->ids[$childside]}_id) values (:parentid, :lineid) on duplicate key update {$parentlink->ids[$parentside]}_id = :parentid, {$parentlink->ids[$childside]}_id = :lineid";
-                    $querydata = [
-                        'parentid' => $parentid,
-                        'lineid' => $line->id
-                    ];
-                    $stmt = Db::prepare($query);
-                    $result = $stmt->execute($querydata);
+                        if (!$result) {
+                            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                        }
+                    }
 
-                    if (!$result) {
-                        error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                    if ($newparent) {
+                        $query = "insert into {$tablelink->middle_table} ({$tablelink->ids[$parentside]}_id, {$tablelink->ids[$childside]}_id) values (:parentid, :lineid) on duplicate key update {$tablelink->ids[$parentside]}_id = :parentid, {$tablelink->ids[$childside]}_id = :lineid";
+                        $querydata = [
+                            'parentid' => $newparent,
+                            'lineid' => $line->id
+                        ];
+                        $stmt = Db::prepare($query);
+                        $result = $stmt->execute($querydata);
+
+                        if (!$result) {
+                            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                        }
                     }
                 }
 
@@ -458,6 +493,19 @@ class Linetype
 
             $childlinetype->find_r($childalias, $selects, $joins, $summary);
         }
+
+        if (!$summary) {
+            foreach ($this->find_incoming_links() as $parent) {
+                $parentlinetype = Linetype::load($parent->linetype);
+                $tablelink = Tablelink::load($parent->parent_link);
+                $side = @$parent->reverse ? 1 : 0;
+                $leftJoin = @$child->required ? false : true;
+                $parentalias = $alias . '_'  . (@$parent->alias ?? $tablelink->ids[$side]);
+
+                $joins[] = make_join($tablelink, $parentalias, $alias, $side, $leftJoin);
+                $selects[] = "{$parentalias}.id {$parentalias}_id";
+            }
+        }
     }
 
     private function build_r($alias, &$row, $line, $summary = false, $load_children = false, $load_files = false)
@@ -517,6 +565,20 @@ class Linetype
             $childlinetype->build_r($childalias, $row, $childline, $summary, $load_children, $load_files);
 
             $line->{$childaliasshort} = $childline;
+        }
+
+        if (!$summary) {
+            foreach ($this->find_incoming_links() as $parent) {
+                $parentlinetype = Linetype::load($parent->linetype);
+                $tablelink = Tablelink::load($parent->parent_link);
+                $side = @$parent->reverse ? 1 : 0;
+                $leftJoin = @$child->required ? false : true;
+                $parentalias = $alias . '_'  . (@$parent->alias ?? $tablelink->ids[$side]);
+
+                if ($row["{$parentalias}_id"]) {
+                    $line->{$tablelink->ids[$side]} = $row["{$parentalias}_id"];
+                }
+            }
         }
 
         if (!$summary && method_exists($this, 'fuse')) {
