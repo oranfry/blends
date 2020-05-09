@@ -327,7 +327,7 @@ class Linetype
         $field->fuse = "if ((" . implode(') or (', $field->clauses) . "), '{$fieldname}', '')";
     }
 
-    public function find_lines($filters = null, $parentId = null, $parentLink = null, $summary = false)
+    public function find_lines($filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
     {
         $filters = $filters ?? [];
 
@@ -411,7 +411,7 @@ class Linetype
 
             $line->type = $this->name;
 
-            $this->build_r('t', $row, $line, $summary);
+            $this->build_r('t', $row, $line, $summary, $load_children, $load_files);
 
             if ($summary) {
                 return $line;
@@ -460,7 +460,7 @@ class Linetype
         }
     }
 
-    private function build_r($alias, &$row, $line, $summary = false)
+    private function build_r($alias, &$row, $line, $summary = false, $load_children = false, $load_files = false)
     {
         if (!$summary) {
             $line->id = $row["{$alias}_id"];
@@ -476,7 +476,12 @@ class Linetype
                 $file = FILES_HOME . '/' . $path;
 
                 if (file_exists($file)) {
-                    $line->{$field->name} = $path;
+                    if ($load_files) {
+                        echo "{$file}\n";
+                        $line->{$field->name} = base64_encode(file_get_contents($file));
+                    } else {
+                        $line->{"{$field->name}_path"} = $path;
+                    }
                 }
             }
 
@@ -510,13 +515,17 @@ class Linetype
             $childlinetype = Linetype::load($child->linetype);
             $childline = (object) [];
 
-            $childlinetype->build_r($childalias, $row, $childline, $summary);
+            $childlinetype->build_r($childalias, $row, $childline, $summary, $load_children, $load_files);
 
             $line->{$childaliasshort} = $childline;
         }
 
         if (!$summary && method_exists($this, 'fuse')) {
             $this->fuse($line);
+        }
+
+        if ($load_children) {
+            $this->load_children($line);
         }
     }
 
