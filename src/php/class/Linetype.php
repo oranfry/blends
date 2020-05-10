@@ -275,7 +275,7 @@ class Linetype
                 foreach ($this->find_incoming_links() as $parent) {
                     $tablelink = Tablelink::load($parent->parent_link);
                     $parentside = @$parent->reverse ? 1 : 0;
-                    $childside = ($parentside + 1 % 2);
+                    $childside = ($parentside + 1) % 2;
 
                     $newparent = @$line->{$tablelink->ids[$parentside]};
                     $oldparent = @$oldline->{$tablelink->ids[$parentside]};
@@ -408,8 +408,16 @@ class Linetype
                 $repeater = Repeater::create($filter->value);
                 $wheres[] = $repeater->get_clause($expression);
             } elseif (is_array($filter->value) && $cmp == '=') {
-                $value =  '(' . implode(',', array_map(function($e){ return "'{$e}'"; }, $filter->value)) . ')';
-                $wheres[] = "{$expression} in {$value}";
+                if (count($filter->value)) {
+                    $value =  '(' . implode(',', array_map(function($e){ return "'{$e}'"; }, $filter->value)) . ')';
+                    $wheres[] = "{$expression} in {$value}";
+                } else {
+                    if ($summary) {
+                        return (object) [];
+                    }
+
+                    return [];
+                }
             } else {
                 $wheres[] = "{$expression} {$cmp} '{$filter->value}'";
             }
