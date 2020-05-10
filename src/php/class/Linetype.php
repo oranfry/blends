@@ -1029,6 +1029,6 @@ class Linetype
             error_response("Failed to create the file for field {$field->name}");
         }
 
-        $line->{$field->name} = $shortpath;
+        $line->{"{$field->name}_path"} = $shortpath;
     }
 }
