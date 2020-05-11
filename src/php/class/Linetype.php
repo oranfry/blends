@@ -13,6 +13,8 @@ class Linetype
     public $unfuse_fields = [];
     public $label;
 
+    private static $incoming_links = null;
+
     public static function load($name)
     {
         $linetypeclass = @Config::get()->linetypes[$name];
@@ -75,21 +77,28 @@ class Linetype
     {
     }
 
-    public function find_incoming_links()
+    public final function find_incoming_links()
     {
-        $links = [];
+        if (self::$incoming_links == null) {
+            self::$incoming_links = [];
 
-        foreach (Config::get()->linetypes as $name => $class) {
-            $linetype = Linetype::load($name);
+            foreach (Config::get()->linetypes as $name => $class) {
+                $linetype = Linetype::load($name);
 
-            foreach ($linetype->children as $child) {
-                if ($child->linetype == $this->name) {
-                    $links[] = $child;
+                foreach ($linetype->children as $child) {
+                    $link = clone $child;
+                    $link->parent_linetype = $name;
+
+                    if (!isset(self::$incoming_links[$child->linetype])) {
+                        self::$incoming_links[$child->linetype] = [];
+                    }
+
+                    self::$incoming_links[$child->linetype][] = $link;
                 }
             }
         }
 
-        return $links;
+        return @self::$incoming_links[$this->name] ?: [];
     }
 
     public function ashtml($line)
@@ -272,13 +281,13 @@ class Linetype
 
                 $this->upload_r($line);
 
-                foreach ($this->find_incoming_links() as $parent) {
-                    $tablelink = Tablelink::load($parent->parent_link);
-                    $parentside = @$parent->reverse ? 1 : 0;
+                foreach ($this->find_incoming_links() as $incoming) {
+                    $tablelink = Tablelink::load($incoming->parent_link);
+                    $parentside = @$incoming->reverse ? 1 : 0;
                     $childside = ($parentside + 1) % 2;
 
-                    $newparent = @$line->{$tablelink->ids[$parentside]};
-                    $oldparent = @$oldline->{$tablelink->ids[$parentside]};
+                    $newparent = @$line->{$incoming->parent_linetype};
+                    $oldparent = @$oldline->{$incoming->parent_linetype};
 
                     if ($newparent == $oldparent) {
                         continue;
@@ -310,6 +319,16 @@ class Linetype
                         if (!$result) {
                             error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                         }
+                    }
+                }
+
+                foreach ($this->children as $child) {
+                    if (property_exists($line, $child->label)) {
+                        foreach ($line->{$child->label} as $childline) {
+                            $childline->{$this->name} = $line->id;
+                        }
+
+                        Linetype::load($child->linetype)->save($line->{$child->label});
                     }
                 }
 
@@ -503,12 +522,11 @@ class Linetype
         }
 
         if (!$summary) {
-            foreach ($this->find_incoming_links() as $parent) {
-                $parentlinetype = Linetype::load($parent->linetype);
-                $tablelink = Tablelink::load($parent->parent_link);
-                $side = @$parent->reverse ? 1 : 0;
+            foreach ($this->find_incoming_links() as $incoming) {
+                $tablelink = Tablelink::load($incoming->parent_link);
+                $side = @$incoming->reverse ? 1 : 0;
                 $leftJoin = @$child->required ? false : true;
-                $parentalias = $alias . '_'  . (@$parent->alias ?? $tablelink->ids[$side]);
+                $parentalias = $alias . '_'  . $incoming->parent_linetype;
 
                 $joins[] = make_join($tablelink, $parentalias, $alias, $side, $leftJoin);
                 $selects[] = "{$parentalias}.id {$parentalias}_id";
@@ -576,15 +594,14 @@ class Linetype
         }
 
         if (!$summary) {
-            foreach ($this->find_incoming_links() as $parent) {
-                $parentlinetype = Linetype::load($parent->linetype);
-                $tablelink = Tablelink::load($parent->parent_link);
-                $side = @$parent->reverse ? 1 : 0;
+            foreach ($this->find_incoming_links() as $incoming) {
+                $tablelink = Tablelink::load($incoming->parent_link);
+                $side = @$incoming->reverse ? 1 : 0;
                 $leftJoin = @$child->required ? false : true;
-                $parentalias = $alias . '_'  . (@$parent->alias ?? $tablelink->ids[$side]);
+                $parentalias = $alias . '_'  . $incoming->parent_linetype;
 
                 if ($row["{$parentalias}_id"]) {
-                    $line->{$tablelink->ids[$side]} = $row["{$parentalias}_id"];
+                    $line->{$incoming->parent_linetype} = $row["{$parentalias}_id"];
                 }
             }
         }
@@ -1038,5 +1055,39 @@ class Linetype
         }
 
         $line->{"{$field->name}_path"} = $shortpath;
+    }
+
+    public function strip_r($line)
+    {
+        unset($line->id);
+        unset($line->type);
+
+        foreach ($this->fields as $field) {
+            if (@$field->derived) {
+                unset($line->{$field->name});
+            }
+
+            if (!@$line->{$field->name}) {
+                unset($line->{$field->name});
+            }
+        }
+
+        foreach ($this->find_incoming_links() as $incoming) {
+            unset($line->{$incoming->parent_linetype});
+        }
+
+        foreach ($this->children as $child) {
+            if (!property_exists($line, $child->label) || !is_array($line->{$child->label})) {
+                continue;
+            }
+
+            if (count($line->{$child->label})) {
+                foreach ($line->{$child->label} as $childline) {
+                    Linetype::load($child->linetype)->strip_r($childline);
+                }
+            } else {
+                unset($line->{$child->label});
+            }
+        }
     }
 }
