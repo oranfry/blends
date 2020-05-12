@@ -706,8 +706,10 @@ class Linetype
                 error_response("File field {$this->name}.{$field->name} not marked as generable");
             }
 
-            $this->load_children($line);
-            $filedata = $this->aspdf($line);
+            $clone = clone $line;
+
+            $this->load_children($clone);
+            $filedata = $this->aspdf($clone);
 
             $this->save_file($line, $field, $filedata);
         } elseif (@$line->{"{$field->name}_delete"}) {
