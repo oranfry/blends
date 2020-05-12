@@ -29,54 +29,6 @@ class Linetype
         return $linetype;
     }
 
-    public static function find_parent_linetypes($linetype_name, &$child_descriptors = [])
-    {
-        $parents = [];
-        $child_descriptors = [];
-        $seen = [];
-
-        foreach (array_keys(Config::get()->blends) as $_blend_name) {
-            foreach (Blend::load($_blend_name)->linetypes as $_linetype_name) {
-                if (@$seen[$_linetype_name]) {
-                    continue;
-                }
-
-                $seen[$_linetype_name] = true;
-                $_linetype = Linetype::load($_linetype_name);
-                $mes = @filter_objects($_linetype->children, 'linetype', 'is', $linetype_name);
-
-                foreach ($mes as $me) {
-                    $parents[] = $_linetype;
-                    $child_descriptors[] = $me;
-                }
-            }
-        }
-
-        return $parents;
-    }
-
-    public function complete($line)
-    {
-    }
-
-    public function unpack($line)
-    {
-    }
-
-    public function get_suggested_values()
-    {
-        return [];
-    }
-
-    public function validate($line)
-    {
-        return [];
-    }
-
-    public function astext($line)
-    {
-    }
-
     public final function find_incoming_links()
     {
         if (self::$incoming_links == null) {
@@ -99,6 +51,28 @@ class Linetype
         }
 
         return @self::$incoming_links[$this->name] ?: [];
+    }
+
+    public function complete($line)
+    {
+    }
+
+    public function unpack($line)
+    {
+    }
+
+    public function get_suggested_values()
+    {
+        return [];
+    }
+
+    public function validate($line)
+    {
+        return [];
+    }
+
+    public function astext($line)
+    {
     }
 
     public function ashtml($line)
