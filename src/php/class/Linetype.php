@@ -279,15 +279,14 @@ class Linetype
             if (@$line) {
                 $line->id = $ids['t_id'];
 
-                $this->upload_r($line);
-
                 foreach ($this->find_incoming_links() as $incoming) {
                     $tablelink = Tablelink::load($incoming->parent_link);
                     $parentside = @$incoming->reverse ? 1 : 0;
                     $childside = ($parentside + 1) % 2;
+                    $parentaliasshort = $incoming->parent_link;
 
-                    $newparent = @$line->{$incoming->parent_linetype};
-                    $oldparent = @$oldline->{$incoming->parent_linetype};
+                    $newparent = @$line->{$parentaliasshort};
+                    $oldparent = @$oldline->{$parentaliasshort};
 
                     if ($newparent == $oldparent) {
                         continue;
@@ -325,12 +324,14 @@ class Linetype
                 foreach ($this->children as $child) {
                     if (property_exists($line, $child->label)) {
                         foreach ($line->{$child->label} as $childline) {
-                            $childline->{$this->name} = $line->id;
+                            $childline->{$child->parent_link} = $line->id;
                         }
 
                         Linetype::load($child->linetype)->save($line->{$child->label});
                     }
                 }
+
+                $this->upload_r($line);
 
                 if (@$this->printonsave) {
                     print_line($this, $line, load_children($this, $line));
@@ -526,7 +527,8 @@ class Linetype
                 $tablelink = Tablelink::load($incoming->parent_link);
                 $side = @$incoming->reverse ? 1 : 0;
                 $leftJoin = @$child->required ? false : true;
-                $parentalias = $alias . '_'  . $incoming->parent_linetype;
+                $parentaliasshort = $incoming->parent_link;
+                $parentalias = $alias . '_'  . $parentaliasshort;
 
                 $joins[] = make_join($tablelink, $parentalias, $alias, $side, $leftJoin);
                 $selects[] = "{$parentalias}.id {$parentalias}_id";
@@ -598,10 +600,11 @@ class Linetype
                 $tablelink = Tablelink::load($incoming->parent_link);
                 $side = @$incoming->reverse ? 1 : 0;
                 $leftJoin = @$child->required ? false : true;
-                $parentalias = $alias . '_'  . $incoming->parent_linetype;
+                $parentaliasshort = $incoming->parent_link;
+                $parentalias = $alias . '_'  . $parentaliasshort;
 
                 if ($row["{$parentalias}_id"]) {
-                    $line->{$incoming->parent_linetype} = $row["{$parentalias}_id"];
+                    $line->{$parentaliasshort} = $row["{$parentalias}_id"];
                 }
             }
         }
@@ -1073,7 +1076,8 @@ class Linetype
         }
 
         foreach ($this->find_incoming_links() as $incoming) {
-            unset($line->{$incoming->parent_linetype});
+            $parentaliasshort = $incoming->parent_link;
+            unset($line->{$parentaliasshort});
         }
 
         foreach ($this->children as $child) {
