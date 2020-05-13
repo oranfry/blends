@@ -1019,7 +1019,7 @@ class Linetype
         }
 
         foreach (array_reverse($dirs) as $dir) {
-            if (dir_is_empty($dir)) {
+            if (is_dir($dir) && dir_is_empty($dir)) {
                 rmdir($dir);
             }
         }

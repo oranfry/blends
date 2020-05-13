@@ -93,6 +93,10 @@ function dir_is_empty($dir)
 {
     $handle = opendir($dir);
 
+    if (!$handle) {
+        return true;
+    }
+
     while (false !== ($entry = readdir($handle))) {
         if ($entry == '.' || $entry == '..') {
            continue;
