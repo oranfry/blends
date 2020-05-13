@@ -325,33 +325,26 @@ class Linetype
         return $lines;
     }
 
-    public function unlink($lines)
+    public function unlink($line, $from)
     {
-        foreach ($lines as $line) {
-            $id = $line->id;
+        $parentaliasshort = null;
 
-            if (!preg_match('/^([a-z]+):([a-z]+)=([0-9][0-9]*)$/', $line->parent, $groups)) {
-                error_response('Invalid parent specification');
-            }
+        foreach ($this->find_incoming_links() as $incoming) {
+            $_parentaliasshort = $incoming->parent_link . '_' . $incoming->parent_linetype;
 
-            $tablelink = Tablelink::load($groups[1]);
-            $parentside = @array_flip($tablelink->ids)[$groups[2]];
-            $childside = ($parentside + 1) % 2;
-            $parentid = intval($groups[3]);
-
-            $query = "delete from {$tablelink->middle_table} where {$tablelink->ids[$parentside]}_id = :parentid and {$tablelink->ids[$childside]}_id = :lineid";
-            $querydata = [
-                'parentid' => $parentid,
-                'lineid' => $line->id,
-            ];
-
-            $stmt = Db::prepare($query);
-            $result = $stmt->execute($querydata);
-
-            if (!$result) {
-                error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+            if ($from == $_parentaliasshort) {
+                $parentaliasshort = $_parentaliasshort;
+                break;
             }
         }
+
+        if (!$parentaliasshort) {
+            error_response('Invalid parent specification');
+        }
+
+        unset($line->{$parentaliasshort});
+
+        return $this->save([$line]);
     }
 
     public function build_class_field_fuse($fieldname)
