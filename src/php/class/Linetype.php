@@ -155,8 +155,16 @@ class Linetype
         return ['messages' => ['Printed Happily']];
     }
 
-    public function save($lines)
+    public function save($lines, $level = 0, $timestamp = null)
     {
+        if (!$timestamp) {
+            $timestamp = date('Y-m-d H:i:s');
+        }
+
+        if ($level == 0) {
+            commit($timestamp, $this->name, $lines);
+        }
+
         if (!is_array($lines)) {
             error_response("Linetype::save - please pass in an array of lines");
         }
@@ -187,7 +195,7 @@ class Linetype
             $ids = [];
             $oldline = @$line->id ? $oldlines[$line->id] : null;
 
-            $this->save_r('t', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids);
+            $this->save_r('t', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
 
             foreach ($statements as $statement) {
                 @list($query, $querydata, $saveto) = $statement;
@@ -301,7 +309,7 @@ class Linetype
                             $childline->{$child->parent_link} = $line->id;
                         }
 
-                        Linetype::load($child->linetype)->save($line->{$child->label});
+                        Linetype::load($child->linetype)->save($line->{$child->label}, $level + 1, $timestamp);
                     }
                 }
 
@@ -696,7 +704,7 @@ class Linetype
         unset($line->{"{$field->name}_delete"});
     }
 
-    private function save_r($alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids)
+    private function save_r($alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $level, $timestamp)
     {
         foreach ($this->unfuse_fields as $field => $expression) {
             $field_full = str_replace('{t}', $alias, $field);
@@ -758,6 +766,11 @@ class Linetype
                 }
             }
 
+            if ($timestamp !== null) {
+                $fields[] = 'created';
+                $values[] = ":created";
+            }
+
             $fieldsClause = implode(', ', $fields);
             $valuesClause = implode(', ', $values);
 
@@ -767,6 +780,10 @@ class Linetype
 
             foreach ($needed_vars as $nv) {
                 $querydata[$nv] = $data[$nv];
+            }
+
+            if ($timestamp !== null) {
+                $querydata['created'] = $timestamp;
             }
 
             $statements[] = [$q, $querydata, "{$alias}_id"];
@@ -810,7 +827,9 @@ class Linetype
                 $unfuse_fields,
                 $data,
                 $statements,
-                $ids
+                $ids,
+                $level,
+                $timestamp
             );
         }
 
@@ -833,7 +852,7 @@ class Linetype
                     $childline->_is = false;
                 }
 
-                $childlinetype->save($childlines);
+                $childlinetype->save($childlines, $level + 1, $timestamp);
             }
 
             if ($tablelink) {
