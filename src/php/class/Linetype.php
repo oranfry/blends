@@ -306,7 +306,8 @@ class Linetype
                 foreach ($this->children as $child) {
                     if (property_exists($line, $child->label)) {
                         foreach ($line->{$child->label} as $childline) {
-                            $childline->{$child->parent_link} = $line->id;
+                            $parentaliasshort = $child->parent_link . '_' . $this->name;
+                            $childline->{$parentaliasshort} = $line->id;
                         }
 
                         Linetype::load($child->linetype)->save($line->{$child->label}, $level + 1, $timestamp);
@@ -1055,7 +1056,7 @@ class Linetype
         $line->{"{$field->name}_path"} = $shortpath;
     }
 
-    public function strip_r($line)
+    public function strip_r($line, $level = 0)
     {
         unset($line->id);
         unset($line->type);
@@ -1070,9 +1071,11 @@ class Linetype
             }
         }
 
-        foreach ($this->find_incoming_links() as $incoming) {
-            $parentaliasshort = $incoming->parent_link . '_' . $incoming->parent_linetype;
-            unset($line->{$parentaliasshort});
+        if ($level > 0) {
+            foreach ($this->find_incoming_links() as $incoming) {
+                $parentaliasshort = $incoming->parent_link . '_' . $incoming->parent_linetype;
+                unset($line->{$parentaliasshort});
+            }
         }
 
         foreach ($this->children as $child) {
@@ -1082,7 +1085,7 @@ class Linetype
 
             if (count($line->{$child->label})) {
                 foreach ($line->{$child->label} as $childline) {
-                    Linetype::load($child->linetype)->strip_r($childline);
+                    Linetype::load($child->linetype)->strip_r($childline, $level + 1);
                 }
             } else {
                 unset($line->{$child->label});
