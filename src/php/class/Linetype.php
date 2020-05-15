@@ -155,14 +155,10 @@ class Linetype
         return ['messages' => ['Printed Happily']];
     }
 
-    public function save($lines, $level = 0, $timestamp = null)
+    public function save($lines, $level = 0, $timestamp = null, $keep_filedata = false)
     {
         if (!$timestamp) {
             $timestamp = date('Y-m-d H:i:s');
-        }
-
-        if ($level == 0) {
-            commit($timestamp, $this->name, $lines);
         }
 
         if (!is_array($lines)) {
@@ -319,6 +315,24 @@ class Linetype
                 if (@$this->printonsave) {
                     print_line($this, $line, load_children($this, $line));
                 }
+            }
+        }
+
+        if ($level == 0) {
+            $lines_clone = [];
+
+            foreach ($lines as $line) {
+                $line_clone = $this->clone_r($line);
+                $this->strip_r($line_clone);
+                $lines_clone[] = $line_clone;
+            }
+
+            commit($timestamp, $this->name, $lines_clone);
+        }
+
+        if (!$keep_filedata) {
+            foreach ($lines as $line) {
+                $this->stripfiledata_r($line);
             }
         }
 
@@ -694,7 +708,6 @@ class Linetype
             return; //nothing to do
         }
 
-        unset($line->{$field->name});
         unset($line->{"{$field->name}_delete"});
     }
 
@@ -1047,6 +1060,7 @@ class Linetype
         }
 
         $line->{"{$field->name}_path"} = $shortpath;
+        $line->{$field->name} = base64_encode($filedata);
     }
 
     public function strip_r($line, $level = 0)
@@ -1084,5 +1098,79 @@ class Linetype
                 unset($line->{$child->label});
             }
         }
+    }
+
+    public function stripfiledata_r($line)
+    {
+        foreach ($this->fields as $field) {
+            if ($field->type == 'file') {
+                unset($line->{$field->name});
+            }
+        }
+
+        foreach ($this->children as $child) {
+            if (!property_exists($line, $child->label) || !is_array($line->{$child->label})) {
+                continue;
+            }
+
+            foreach ($line->{$child->label} as $childline) {
+                Linetype::load($child->linetype)->stripfiledata_r($childline);
+            }
+        }
+
+        foreach (@$this->inlinelinks ?? [] as $child) {
+            if (@$child->norecurse) {
+                continue;
+            }
+
+            $childtablelink = Tablelink::load($child->tablelink);
+
+            if (@$child->reverse) {
+                $childtablelink = $childtablelink->reverse();
+            }
+
+            $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
+            $childline = @$line->{$childaliasshort};
+
+            if ($childline) {
+                Linetype::load($child->linetype)->stripfiledata_r($childline);
+            }
+        }
+    }
+
+    public function clone_r($line, $level = 0)
+    {
+        $clone = clone $line;
+
+        foreach ($this->children as $child) {
+            if (!property_exists($line, $child->label) || !is_array($line->{$child->label})) {
+                continue;
+            }
+
+            foreach ($line->{$child->label} as $i => $childline) {
+                $line->{$child->label}[$i] = Linetype::load($child->linetype)->clone_r($childline);
+            }
+        }
+
+        foreach (@$this->inlinelinks ?? [] as $child) {
+            if (@$child->norecurse) {
+                continue;
+            }
+
+            $childtablelink = Tablelink::load($child->tablelink);
+
+            if (@$child->reverse) {
+                $childtablelink = $childtablelink->reverse();
+            }
+
+            $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
+            $childline = @$line->{$childaliasshort};
+
+            if ($childline) {
+                $line->{$childaliasshort} = Linetype::load($child->linetype)->clone_r($childline);
+            }
+        }
+
+        return $clone;
     }
 }
