@@ -321,7 +321,7 @@ class Linetype
         if ($level == 0) {
             $lines_clone = [];
 
-            foreach ($lines as $line) {
+            foreach ($lines as $i => $line) {
                 $line_clone = $this->clone_r($line);
                 $this->strip_r($line_clone);
 
