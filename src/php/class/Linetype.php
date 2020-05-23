@@ -324,6 +324,11 @@ class Linetype
             foreach ($lines as $line) {
                 $line_clone = $this->clone_r($line);
                 $this->strip_r($line_clone);
+
+                if (isset($oldids[$i])) {
+                    $line_clone->id = $oldids[$i];
+                }
+
                 $lines_clone[] = $line_clone;
             }
 
