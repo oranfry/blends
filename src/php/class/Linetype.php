@@ -1083,20 +1083,16 @@ class Linetype
             }
         }
 
-        if ($level > 0) {
-            foreach ($this->find_incoming_links() as $incoming) {
-                $parentaliasshort = $incoming->parent_link . '_' . $incoming->parent_linetype;
-                unset($line->{$parentaliasshort});
-            }
-        }
-
         foreach ($this->children as $child) {
             if (!property_exists($line, $child->label) || !is_array($line->{$child->label})) {
                 continue;
             }
 
             if (count($line->{$child->label})) {
+                $parentaliasshort = $child->parent_link . '_' . $this->name;
+
                 foreach ($line->{$child->label} as $childline) {
+                    unset($childline->{$parentaliasshort});
                     Linetype::load($child->linetype)->strip_r($childline, $level + 1);
                 }
             } else {
