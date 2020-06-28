@@ -396,6 +396,20 @@ class Linetype
         foreach ($filters as $filter) {
             $cmp = @$filter->cmp ?: '=';
 
+            if ((function($linetype, $filter) {
+                foreach ($linetype->find_incoming_links() as $parent) {
+                    $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
+
+                    if ($filter->field == $parentaliasshort) {
+                        return true;
+                    }
+                }
+            })($this, $filter)) {
+                $cmpvalue = is_array($filter->value) ? 'in (' . implode(', ', $filter->value) . ')' : ' = ' . $filter->value;
+                $wheres[] = "t_{$filter->field}.id = {$filter->value}";
+                continue;
+            }
+
             if ($cmp == 'custom') {
                 $field = @filter_objects($this->fields, 'name', 'is', $filter->field)[0];
 
@@ -966,6 +980,8 @@ class Linetype
                 continue;
             }
 
+            // look for standard field
+
             $linetype_field = @array_values(array_filter($this->fields, function ($v) use ($filter) {
                 return $v->name == $filter->field;
             }))[0];
@@ -973,6 +989,17 @@ class Linetype
             if ($linetype_field) {
                 $r[] = $filter;
                 continue;
+            }
+
+            // try a reference field
+
+            foreach ($this->find_incoming_links() as $parent) {
+                $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
+
+                if ($filter->field == $parentaliasshort) {
+                    $r[] = $filter;
+                    continue 2;
+                }
             }
 
             // can't find the field, apply default
