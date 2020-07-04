@@ -782,7 +782,7 @@ class Linetype
             foreach ($unfuse_fields as $field => $expression) {
                 if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
                     $fields[] = $groups[1];
-                    $values[] = $expression;
+                    $values[] = str_replace('t.', '', $expression);
 
                     preg_match_all('/:([a-z_]+)/', $expression, $matches);
 
