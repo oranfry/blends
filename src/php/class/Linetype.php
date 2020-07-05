@@ -111,7 +111,10 @@ class Linetype
 
     public function delete($token, $filters)
     {
-        Blends::verify_token($token);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $this->_delete($token, $filters);
     }
 
@@ -129,7 +132,10 @@ class Linetype
 
     public function print($token, $filters)
     {
-        Blends::verify_token($token);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+;
         return $this->print($token, $filters);
     }
 
@@ -169,7 +175,10 @@ class Linetype
 
     public function save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
     {
-        Blends::verify_token($token);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+;
         return $this->save($token, $lines, $level, $timestamp, $keep_filedata);
     }
 
@@ -364,7 +373,10 @@ class Linetype
 
     public function unlink($token, $line, $from)
     {
-        Blends::verify_token($token);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+;
         return $this->_unlink($token, $line, $from);
     }
 
@@ -412,7 +424,10 @@ class Linetype
         //     error_response('find_lines: pass token as first arg');
         // }
 
-        Blends::verify_token($token);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+;
 
         $filters = $filters ?? [];
 
@@ -959,7 +974,10 @@ class Linetype
 
     public function load_children($token, $line)
     {
-        Blends::verify_token($token);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+;
         return $this->_load_children($token, $line);
     }
 
@@ -976,7 +994,10 @@ class Linetype
 
     public function load_childset($token, $line, $descriptor)
     {
-        Blends::verify_token($token);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+;
         return $this->_load_childset($token, $line, $descriptor);
     }
 

@@ -48,7 +48,7 @@ class Blends
         $tokens = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (!count($tokens)) {
-            error_response('Invalid / expired token');
+            return false;
         }
 
         $stmt = Db::prepare("update record_accesstoken set used = current_timestamp where token = :token");

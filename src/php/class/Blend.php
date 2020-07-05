@@ -48,6 +48,10 @@ class Blend
 
     public function search($token, $filters)
     {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
         }, $this->linetypes);
@@ -132,6 +136,10 @@ class Blend
 
     public function summary($token, $filters)
     {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $summary_fields = filter_objects($this->fields, 'summary', 'is', 'sum');
 
         if (!count($summary_fields)) {
@@ -178,6 +186,10 @@ class Blend
 
     public function update($token, $filters, $data)
     {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
         }, $this->linetypes);
