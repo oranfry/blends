@@ -46,7 +46,7 @@ class Blend
         }
     }
 
-    public function search($filters)
+    public function search($token, $filters)
     {
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
@@ -65,7 +65,7 @@ class Blend
                 continue;
             }
 
-            $_records = $linetype->find_lines($_filters);
+            $_records = $linetype->find_lines($token, $_filters);
 
             foreach ($_records as $record) {
                 $record->type = @$this->hide_types[$linetype->name] ?: $linetype->name;
@@ -130,7 +130,7 @@ class Blend
         }
     }
 
-    public function summary($filters)
+    public function summary($token, $filters)
     {
         $summary_fields = filter_objects($this->fields, 'summary', 'is', 'sum');
 
@@ -166,7 +166,7 @@ class Blend
                 }
             }
 
-            $summary = $linetype->find_lines($linetype_filters, null, null, true);
+            $summary = $linetype->find_lines($token, $linetype_filters, null, null, true);
 
             foreach ($summary_fields as $field) {
                 $balances->{$field->name} = bcadd($balances->{$field->name}, @$summary->{$field->name} ?? '0.00', 2);
@@ -176,7 +176,7 @@ class Blend
         return $balances;
     }
 
-    public function update($filters, $data)
+    public function update($token, $filters, $data)
     {
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
@@ -189,7 +189,7 @@ class Blend
                 continue;
             }
 
-            $lines = $linetype->find_lines($_filters);
+            $lines = $linetype->find_lines($token, $_filters);
 
             foreach ($lines as $line) {
                 foreach ($linetype->fields as $field) {
