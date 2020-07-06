@@ -178,8 +178,8 @@ class Linetype
         if (!Blends::verify_token($token)) {
             return false;
         }
-;
-        return $this->save($token, $lines, $level, $timestamp, $keep_filedata);
+
+        return $this->_save($token, $lines, $level, $timestamp, $keep_filedata);
     }
 
     private function _save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
@@ -218,7 +218,7 @@ class Linetype
             $ids = [];
             $oldline = @$line->id ? $oldlines[$line->id] : null;
 
-            $this->save_r('t', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
+            $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
 
             foreach ($statements as $statement) {
                 @list($query, $querydata, $saveto) = $statement;
@@ -895,6 +895,7 @@ class Linetype
             $childoldline = @$oldline->{$childaliasshort};
 
             $childlinetype->save_r(
+                $token,
                 $alias . '_'  . $childaliasshort,
                 $childline,
                 $childoldline,
