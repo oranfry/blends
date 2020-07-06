@@ -3,12 +3,12 @@ class Blends
 {
     public static $verified_tokens = [];
 
-    public static function login()
+    public static function login($username, $password)
     {
         $stmt = Db::prepare("select * from record_user where username = :username and password = sha2(concat(:password, `salt`), 256)");
         $result = $stmt->execute([
-            'username' => @$_POST['username'],
-            'password' => @$_POST['password'],
+            'username' => $username,
+            'password' => $password,
         ]);
 
         if (!$result) {
