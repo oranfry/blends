@@ -1,6 +1,8 @@
 <?php
 class Blends
 {
+    public static $verified_tokens = [];
+
     public static function login()
     {
         $stmt = Db::prepare("select * from record_user where username = :username and password = sha2(concat(:password, `salt`), 256)");
@@ -36,26 +38,35 @@ class Blends
 
     public static function verify_token($token)
     {
-        $stmt = Db::prepare("select * from record_accesstoken where token = :token and `used` + interval `ttl` second >= now()");
+        if (in_array($token, static::$verified_tokens)) {
+            return true;
+        }
+
+        $stmt = Db::prepare("update record_accesstoken set used = current_timestamp, hits = hits + 1 where token = :token and used + interval ttl second >= current_timestamp");
         $result = $stmt->execute([
             'token' => $token,
         ]);
 
         if (!$result) {
-            error_response('Token Verification Error ' . Db::error(), 500);
+            error_response('Token Verification Error ' . implode(' - ', $stmt->errorInfo()), 500);
         }
 
-        $tokens = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        if (!count($tokens)) {
-            return false;
+        if ($stmt->rowCount() > 0) {
+            static::$verified_tokens[] = $token;
         }
 
-        $stmt = Db::prepare("update record_accesstoken set used = current_timestamp where token = :token");
+        return $stmt->rowCount() > 0;
+    }
+
+    public static function logout($token)
+    {
+        $stmt = Db::prepare("delete from record_accesstoken where token = :token");
         $result = $stmt->execute([
             'token' => $token,
         ]);
 
-        return true;
+        if (!$result) {
+            error_response('Logout Error ' . Db::error(), 500);
+        }
     }
 }
