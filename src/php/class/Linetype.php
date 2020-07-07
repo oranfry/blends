@@ -127,7 +127,7 @@ class Linetype
             $lines[] = (object)['id' => $line->id, '_is' => false];
         }
 
-        $this->save($lines);
+        $this->save($token, $lines);
     }
 
     public function print($token, $filters)
@@ -135,8 +135,8 @@ class Linetype
         if (!Blends::verify_token($token)) {
             return false;
         }
-;
-        return $this->print($token, $filters);
+
+        return $this->_print($token, $filters);
     }
 
     private function _print($token, $filters)
@@ -260,7 +260,7 @@ class Linetype
                 $joins = [];
                 $selects = []; // ignore
 
-                $this->find_r('t', $selects, $joins);
+                $this->_find_r($token, 't', $selects, $joins);
 
                 $join = implode(' ', $joins);
                 $set = implode(', ', $updates);
@@ -333,14 +333,14 @@ class Linetype
                             $childline->{$parentaliasshort} = $line->id;
                         }
 
-                        Linetype::load($child->linetype)->save($line->{$child->label}, $level + 1, $timestamp);
+                        Linetype::load($child->linetype)->save($token, $line->{$child->label}, $level + 1, $timestamp);
                     }
                 }
 
                 $this->upload_r($line);
 
                 if (@$this->printonsave) {
-                    print_line($this, $line, load_children($this, $line));
+                    $this->print($token, ['field' => 'id', 'cmp' => '=', 'value' => $line->id]); // not implemented
                 }
             }
         }
@@ -376,7 +376,7 @@ class Linetype
         if (!Blends::verify_token($token)) {
             return false;
         }
-;
+
         return $this->_unlink($token, $line, $from);
     }
 
@@ -399,7 +399,7 @@ class Linetype
 
         unset($line->{$parentaliasshort});
 
-        return $this->save([$line]);
+        return $this->save($token, [$line]);
     }
 
     public function build_class_field_fuse($fieldname)
@@ -427,7 +427,6 @@ class Linetype
         if (!Blends::verify_token($token)) {
             return false;
         }
-;
 
         $filters = $filters ?? [];
 
@@ -506,7 +505,7 @@ class Linetype
             $wheres[] = str_replace('{t}', 't', $clause);
         }
 
-        $this->find_r('t', $selects, $joins, $summary);
+        $this->_find_r($token, 't', $selects, $joins, $summary);
 
         if ($parentLink && $parentId) {
             $tablelink = Tablelink::load($parentLink);
@@ -545,7 +544,7 @@ class Linetype
         return $lines;
     }
 
-    private function find_r($alias, &$selects, &$joins, $summary = false)
+    private function _find_r($token, $alias, &$selects, &$joins, $summary = false)
     {
         if (!$summary) {
             $selects[] = "{$alias}.id {$alias}_id";
@@ -578,7 +577,7 @@ class Linetype
                 continue;
             }
 
-            $childlinetype->find_r($childalias, $selects, $joins, $summary);
+            $childlinetype->_find_r($token, $childalias, $selects, $joins, $summary);
         }
 
         if (!$summary) {
@@ -929,7 +928,7 @@ class Linetype
                     $childline->_is = false;
                 }
 
-                $childlinetype->save($childlines, $level + 1, $timestamp);
+                $childlinetype->save($token, $childlines, $level + 1, $timestamp);
             }
 
             if ($tablelink) {

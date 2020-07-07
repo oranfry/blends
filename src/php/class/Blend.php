@@ -24,7 +24,7 @@ class Blend
         return $blend;
     }
 
-    public function delete($filters)
+    public function delete($token, $filters)
     {
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
@@ -42,7 +42,7 @@ class Blend
                 continue;
             }
 
-            $linetype->delete($_filters);
+            $linetype->delete($token, $_filters);
         }
     }
 
@@ -117,8 +117,12 @@ class Blend
         return  $records;
     }
 
-    public function print($filters)
+    public function print($token, $filters)
     {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
         }, $this->linetypes);
@@ -130,7 +134,7 @@ class Blend
                 continue;
             }
 
-            $linetype->print($_filters);
+            $linetype->print($token, $_filters);
         }
     }
 
@@ -228,7 +232,7 @@ class Blend
                 }
             }
 
-            $linetype->save($lines);
+            $linetype->save($token, $lines);
         }
     }
 }
