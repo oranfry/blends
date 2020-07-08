@@ -795,24 +795,24 @@ class Linetype
 
         if ($is) {
             $this->complete($line);
+
+            foreach ($this->fields as $field) {
+                if ($field->type != 'file') {
+                    if (!@$line->{$field->name}) {
+                        $line->{$field->name} = null;
+                    }
+
+                    $data["{$alias}_{$field->name}"] = $line->{$field->name};
+                }
+            }
+
             $errors = $this->validate($line);
-            $this->unpack($line);
 
             if (count($errors)) {
                 error_response("Invalid {$this->name} ({$alias}): "  . implode(', ', $errors));
             }
 
-            foreach ($this->fields as $field) {
-                if ($field->type != 'file') {
-                    if (!@$line->{$field->name}) {
-                        $value = null;
-                    } else {
-                        $value = $line->{$field->name};
-                    }
-
-                    $data["{$alias}_{$field->name}"] = $value;
-                }
-            }
+            $this->unpack($line);
         }
 
         $dbtable = @Config::get()->tables[$this->table];
