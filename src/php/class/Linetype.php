@@ -144,7 +144,7 @@ class Linetype
         $lines = $this->find_lines($token, $filters);
 
         foreach ($lines as $line) {
-            $this->load_children($line);
+            $this->_load_children($token, $line);
 
             $contents = $this->astext($line);
 
@@ -337,7 +337,7 @@ class Linetype
                     }
                 }
 
-                $this->upload_r($line);
+                $this->_upload_r($token, $line);
 
                 if (@$this->printonsave) {
                     $this->print($token, ['field' => 'id', 'cmp' => '=', 'value' => $line->id]); // not implemented
@@ -532,7 +532,7 @@ class Linetype
 
             $line->type = $this->name;
 
-            $this->build_r('t', $row, $line, $summary, $load_children, $load_files);
+            $this->build_r($token, 't', $row, $line, $summary, $load_children, $load_files);
 
             if ($summary) {
                 return $line;
@@ -594,7 +594,7 @@ class Linetype
         }
     }
 
-    private function build_r($alias, &$row, $line, $summary = false, $load_children = false, $load_files = false)
+    private function build_r($token, $alias, &$row, $line, $summary = false, $load_children = false, $load_files = false)
     {
         if (!$summary) {
             $line->id = $row["{$alias}_id"];
@@ -648,7 +648,7 @@ class Linetype
             $childlinetype = Linetype::load($child->linetype);
             $childline = (object) [];
 
-            $childlinetype->build_r($childalias, $row, $childline, $summary, $load_children, $load_files);
+            $childlinetype->build_r($token, $childalias, $row, $childline, $summary, $load_children, $load_files);
 
             $line->{$childaliasshort} = $childline;
         }
@@ -672,7 +672,7 @@ class Linetype
         }
 
         if ($load_children) {
-            $this->load_children($line);
+            $this->_load_children($token, $line);
         }
     }
 
@@ -737,7 +737,7 @@ class Linetype
         }
     }
 
-    private function handle_upload($field, $line)
+    private function _handle_upload($token, $field, $line)
     {
         if (@$line->{$field->name}) {
             if (@$field->generate_only) {
@@ -766,7 +766,7 @@ class Linetype
 
             $clone = clone $line;
 
-            $this->load_children($clone);
+            $this->_load_children($token, $clone);
             $filedata = $this->aspdf($clone);
 
             $this->_save_file($line, $field, $filedata);
@@ -943,11 +943,11 @@ class Linetype
         }
     }
 
-    private function upload_r($line)
+    private function _upload_r($token, $line)
     {
         foreach ($this->fields as $field) {
             if ($field->type == 'file') {
-                $this->handle_upload($field, $line);
+                $this->_handle_upload($token, $field, $line);
             }
         }
 
@@ -967,7 +967,7 @@ class Linetype
             $childline = @$line->{$childaliasshort};
 
             if ($childline) {
-                $childlinetype->upload_r($childline);
+                $childlinetype->_upload_r($token, $childline);
             }
         }
     }
