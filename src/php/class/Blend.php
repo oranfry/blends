@@ -24,7 +24,7 @@ class Blend
         return $blend;
     }
 
-    public function delete($filters)
+    public function delete($token, $filters)
     {
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
@@ -42,12 +42,16 @@ class Blend
                 continue;
             }
 
-            $linetype->delete($_filters);
+            $linetype->delete($token, $_filters);
         }
     }
 
-    public function search($filters)
+    public function search($token, $filters)
     {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
         }, $this->linetypes);
@@ -65,7 +69,7 @@ class Blend
                 continue;
             }
 
-            $_records = $linetype->find_lines($_filters);
+            $_records = $linetype->find_lines($token, $_filters);
 
             foreach ($_records as $record) {
                 $record->type = @$this->hide_types[$linetype->name] ?: $linetype->name;
@@ -113,8 +117,12 @@ class Blend
         return  $records;
     }
 
-    public function print($filters)
+    public function print($token, $filters)
     {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
         }, $this->linetypes);
@@ -126,12 +134,16 @@ class Blend
                 continue;
             }
 
-            $linetype->print($_filters);
+            $linetype->print($token, $_filters);
         }
     }
 
-    public function summary($filters)
+    public function summary($token, $filters)
     {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $summary_fields = filter_objects($this->fields, 'summary', 'is', 'sum');
 
         if (!count($summary_fields)) {
@@ -166,7 +178,7 @@ class Blend
                 }
             }
 
-            $summary = $linetype->find_lines($linetype_filters, null, null, true);
+            $summary = $linetype->find_lines($token, $linetype_filters, null, null, true);
 
             foreach ($summary_fields as $field) {
                 $balances->{$field->name} = bcadd($balances->{$field->name}, @$summary->{$field->name} ?? '0.00', 2);
@@ -176,8 +188,12 @@ class Blend
         return $balances;
     }
 
-    public function update($filters, $data)
+    public function update($token, $filters, $data)
     {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $linetypes = array_map(function ($linetype_name) {
             return Linetype::load($linetype_name);
         }, $this->linetypes);
@@ -189,7 +205,7 @@ class Blend
                 continue;
             }
 
-            $lines = $linetype->find_lines($_filters);
+            $lines = $linetype->find_lines($token, $_filters);
 
             foreach ($lines as $line) {
                 foreach ($linetype->fields as $field) {
@@ -216,7 +232,7 @@ class Blend
                 }
             }
 
-            $linetype->save($lines);
+            $linetype->save($token, $lines);
         }
     }
 }

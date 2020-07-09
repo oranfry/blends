@@ -109,24 +109,42 @@ class Linetype
         return $filedata;
     }
 
-    public function delete($filters)
+    public function delete($token, $filters)
     {
-        $oldlines = $this->find_lines($filters);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
+        $this->_delete($token, $filters);
+    }
+
+    private function _delete($token, $filters)
+    {
+        $oldlines = $this->_find_lines($token, $filters);
         $lines = [];
 
         foreach ($oldlines as $line) {
             $lines[] = (object)['id' => $line->id, '_is' => false];
         }
 
-        $this->save($lines);
+        $this->save($token, $lines);
     }
 
-    public function print($filters)
+    public function print($token, $filters)
     {
-        $lines = $this->find_lines($filters);
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
+        return $this->_print($token, $filters);
+    }
+
+    private function _print($token, $filters)
+    {
+        $lines = $this->find_lines($token, $filters);
 
         foreach ($lines as $line) {
-            $this->load_children($line);
+            $this->_load_children($token, $line);
 
             $contents = $this->astext($line);
 
@@ -155,7 +173,16 @@ class Linetype
         return ['messages' => ['Printed Happily']];
     }
 
-    public function save($lines, $level = 0, $timestamp = null, $keep_filedata = false)
+    public function save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
+    {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
+        return $this->_save($token, $lines, $level, $timestamp, $keep_filedata);
+    }
+
+    private function _save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
     {
         if (!$timestamp) {
             $timestamp = date('Y-m-d H:i:s');
@@ -179,7 +206,7 @@ class Linetype
         }
 
         if (count($oldids)) {
-            foreach ($this->find_lines([(object)['field' => 'id', 'value' => $oldids]]) as $oldline) {
+            foreach ($this->_find_lines($token, [(object)['field' => 'id', 'value' => $oldids]]) as $oldline) {
                 $oldlines[$oldline->id] = $oldline;
             }
         }
@@ -191,7 +218,7 @@ class Linetype
             $ids = [];
             $oldline = @$line->id ? $oldlines[$line->id] : null;
 
-            $this->save_r('t', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
+            $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
 
             foreach ($statements as $statement) {
                 @list($query, $querydata, $saveto) = $statement;
@@ -233,7 +260,7 @@ class Linetype
                 $joins = [];
                 $selects = []; // ignore
 
-                $this->find_r('t', $selects, $joins);
+                $this->_find_r($token, 't', $selects, $joins);
 
                 $join = implode(' ', $joins);
                 $set = implode(', ', $updates);
@@ -306,14 +333,14 @@ class Linetype
                             $childline->{$parentaliasshort} = $line->id;
                         }
 
-                        Linetype::load($child->linetype)->save($line->{$child->label}, $level + 1, $timestamp);
+                        Linetype::load($child->linetype)->save($token, $line->{$child->label}, $level + 1, $timestamp);
                     }
                 }
 
-                $this->upload_r($line);
+                $this->_upload_r($token, $line);
 
                 if (@$this->printonsave) {
-                    print_line($this, $line, load_children($this, $line));
+                    $this->print($token, ['field' => 'id', 'cmp' => '=', 'value' => $line->id]); // not implemented
                 }
             }
         }
@@ -344,7 +371,16 @@ class Linetype
         return $lines;
     }
 
-    public function unlink($line, $from)
+    public function unlink($token, $line, $from)
+    {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
+        return $this->_unlink($token, $line, $from);
+    }
+
+    private function _unlink($token, $line, $from)
     {
         $parentaliasshort = null;
 
@@ -363,7 +399,7 @@ class Linetype
 
         unset($line->{$parentaliasshort});
 
-        return $this->save([$line]);
+        return $this->save($token, [$line]);
     }
 
     public function build_class_field_fuse($fieldname)
@@ -377,8 +413,21 @@ class Linetype
         $field->fuse = "if ((" . implode(') or (', $field->clauses) . "), '{$fieldname}', '')";
     }
 
-    public function find_lines($filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
+    public function find_lines($token, $filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
     {
+        return $this->_find_lines($token, $filters, $parentId, $parentLink, $summary, $load_children, $load_files);
+    }
+
+    private function _find_lines($token, $filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
+    {
+        // if (is_array($token) || $token === null) {
+        //     error_response('find_lines: pass token as first arg');
+        // }
+
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
         $filters = $filters ?? [];
 
         $dbtable = @Config::get()->tables[$this->table];
@@ -456,7 +505,7 @@ class Linetype
             $wheres[] = str_replace('{t}', 't', $clause);
         }
 
-        $this->find_r('t', $selects, $joins, $summary);
+        $this->_find_r($token, 't', $selects, $joins, $summary);
 
         if ($parentLink && $parentId) {
             $tablelink = Tablelink::load($parentLink);
@@ -483,7 +532,7 @@ class Linetype
 
             $line->type = $this->name;
 
-            $this->build_r('t', $row, $line, $summary, $load_children, $load_files);
+            $this->build_r($token, 't', $row, $line, $summary, $load_children, $load_files);
 
             if ($summary) {
                 return $line;
@@ -495,7 +544,7 @@ class Linetype
         return $lines;
     }
 
-    private function find_r($alias, &$selects, &$joins, $summary = false)
+    private function _find_r($token, $alias, &$selects, &$joins, $summary = false)
     {
         if (!$summary) {
             $selects[] = "{$alias}.id {$alias}_id";
@@ -528,7 +577,7 @@ class Linetype
                 continue;
             }
 
-            $childlinetype->find_r($childalias, $selects, $joins, $summary);
+            $childlinetype->_find_r($token, $childalias, $selects, $joins, $summary);
         }
 
         if (!$summary) {
@@ -545,7 +594,7 @@ class Linetype
         }
     }
 
-    private function build_r($alias, &$row, $line, $summary = false, $load_children = false, $load_files = false)
+    private function build_r($token, $alias, &$row, $line, $summary = false, $load_children = false, $load_files = false)
     {
         if (!$summary) {
             $line->id = $row["{$alias}_id"];
@@ -599,7 +648,7 @@ class Linetype
             $childlinetype = Linetype::load($child->linetype);
             $childline = (object) [];
 
-            $childlinetype->build_r($childalias, $row, $childline, $summary, $load_children, $load_files);
+            $childlinetype->build_r($token, $childalias, $row, $childline, $summary, $load_children, $load_files);
 
             $line->{$childaliasshort} = $childline;
         }
@@ -623,7 +672,7 @@ class Linetype
         }
 
         if ($load_children) {
-            $this->load_children($line);
+            $this->_load_children($token, $line);
         }
     }
 
@@ -688,7 +737,7 @@ class Linetype
         }
     }
 
-    private function handle_upload($field, $line)
+    private function _handle_upload($token, $field, $line)
     {
         if (@$line->{$field->name}) {
             if (@$field->generate_only) {
@@ -709,7 +758,7 @@ class Linetype
                 }
             }
 
-            $this->save_file($line, $field, $filedata);
+            $this->_save_file($line, $field, $filedata);
         } elseif (@$line->{"{$field->name}_generate"}) {
             if (!@$field->generable) {
                 error_response("File field {$this->name}.{$field->name} not marked as generable");
@@ -717,12 +766,12 @@ class Linetype
 
             $clone = clone $line;
 
-            $this->load_children($clone);
+            $this->_load_children($token, $clone);
             $filedata = $this->aspdf($clone);
 
-            $this->save_file($line, $field, $filedata);
+            $this->_save_file($line, $field, $filedata);
         } elseif (@$line->{"{$field->name}_delete"}) {
-            $this->delete_file($line, $field);
+            $this->_delete_file($line, $field);
         } else {
             return; //nothing to do
         }
@@ -730,7 +779,7 @@ class Linetype
         unset($line->{"{$field->name}_delete"});
     }
 
-    private function save_r($alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $level, $timestamp)
+    private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $level, $timestamp)
     {
         foreach ($this->unfuse_fields as $field => $expression) {
             $field_full = str_replace('{t}', $alias, $field);
@@ -746,24 +795,24 @@ class Linetype
 
         if ($is) {
             $this->complete($line);
+
+            foreach ($this->fields as $field) {
+                if ($field->type != 'file') {
+                    if (!@$line->{$field->name}) {
+                        $line->{$field->name} = null;
+                    }
+
+                    $data["{$alias}_{$field->name}"] = $line->{$field->name};
+                }
+            }
+
             $errors = $this->validate($line);
-            $this->unpack($line);
 
             if (count($errors)) {
                 error_response("Invalid {$this->name} ({$alias}): "  . implode(', ', $errors));
             }
 
-            foreach ($this->fields as $field) {
-                if ($field->type != 'file') {
-                    if (!@$line->{$field->name}) {
-                        $value = null;
-                    } else {
-                        $value = $line->{$field->name};
-                    }
-
-                    $data["{$alias}_{$field->name}"] = $value;
-                }
-            }
+            $this->unpack($line);
         }
 
         $dbtable = @Config::get()->tables[$this->table];
@@ -782,7 +831,7 @@ class Linetype
             foreach ($unfuse_fields as $field => $expression) {
                 if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
                     $fields[] = $groups[1];
-                    $values[] = $expression;
+                    $values[] = str_replace('t.', '', $expression);
 
                     preg_match_all('/:([a-z_]+)/', $expression, $matches);
 
@@ -845,6 +894,7 @@ class Linetype
             $childoldline = @$oldline->{$childaliasshort};
 
             $childlinetype->save_r(
+                $token,
                 $alias . '_'  . $childaliasshort,
                 $childline,
                 $childoldline,
@@ -862,7 +912,7 @@ class Linetype
         if ($was && !$is) {
             foreach ($this->fields as $field) {
                 if ($field->type == 'file') {
-                    $this->delete_file($line, $field);
+                    $this->_delete_file($line, $field);
                 }
             }
 
@@ -872,13 +922,13 @@ class Linetype
                 }
 
                 $childlinetype = Linetype::load($child->linetype);
-                $childlines = $childlinetype->find_lines(null, $line->id, $child->parent_link);
+                $childlines = $childlinetype->_find_lines($token, null, $line->id, $child->parent_link);
 
                 foreach ($childlines as $childline) {
                     $childline->_is = false;
                 }
 
-                $childlinetype->save($childlines, $level + 1, $timestamp);
+                $childlinetype->save($token, $childlines, $level + 1, $timestamp);
             }
 
             if ($tablelink) {
@@ -893,11 +943,11 @@ class Linetype
         }
     }
 
-    private function upload_r($line)
+    private function _upload_r($token, $line)
     {
         foreach ($this->fields as $field) {
             if ($field->type == 'file') {
-                $this->handle_upload($field, $line);
+                $this->_handle_upload($token, $field, $line);
             }
         }
 
@@ -917,31 +967,49 @@ class Linetype
             $childline = @$line->{$childaliasshort};
 
             if ($childline) {
-                $childlinetype->upload_r($childline);
+                $childlinetype->_upload_r($token, $childline);
             }
         }
     }
 
-    public function load_children($line)
+    public function load_children($token, $line)
+    {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+;
+        return $this->_load_children($token, $line);
+    }
+
+    private function _load_children($token, $line)
     {
         $sets = [];
 
         foreach ($this->children as $child) {
-            $sets[] = $this->load_childset($line, $child);
+            $sets[] = $this->_load_childset($token, $line, $child);
         }
 
         return $sets;
     }
 
-    public function load_childset($line, $descriptor)
+    public function load_childset($token, $line, $descriptor)
+    {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+;
+        return $this->_load_childset($token, $line, $descriptor);
+    }
+
+    private function _load_childset($token, $line, $descriptor)
     {
         $child_linetype = Linetype::load(@$descriptor->linetype);
         $fields = $child_linetype->fields;
 
-        $line->{$descriptor->label} = $child_linetype->find_lines(null, $line->id, $descriptor->parent_link);
+        $line->{$descriptor->label} = $child_linetype->find_lines($token, null, $line->id, $descriptor->parent_link);
 
         if (filter_objects($child_linetype->fields, 'summary', 'is', 'sum')) {
-            $line->{"{$descriptor->label}_summary"} = $child_linetype->find_lines(null, $line->id, $descriptor->parent_link, true);
+            $line->{"{$descriptor->label}_summary"} = $child_linetype->find_lines($token, null, $line->id, $descriptor->parent_link, true);
         }
 
         return $line->{$descriptor->label};
@@ -1042,7 +1110,7 @@ class Linetype
         return "{$field->path}/{$intermediate}/{$line->id}.pdf";
     }
 
-    private function delete_file($line, $field)
+    private function _delete_file($line, $field)
     {
         $shortpath = $this->file_path($line, $field);
         $filepath = FILES_HOME . '/' . $shortpath;
@@ -1065,7 +1133,7 @@ class Linetype
         $line->{$field->name} = null;
     }
 
-    private function save_file($line, $field, $filedata)
+    private function _save_file($line, $field, $filedata)
     {
         $shortpath = $this->file_path($line, $field);
         $filepath = FILES_HOME . '/' . $shortpath;
