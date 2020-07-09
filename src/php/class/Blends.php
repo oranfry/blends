@@ -5,17 +5,23 @@ class Blends
 
     public static function login($username, $password)
     {
-        $stmt = Db::prepare("select * from record_user where username = :username and password = sha2(concat(:password, `salt`), 256)");
-        $result = $stmt->execute([
-            'username' => $username,
-            'password' => $password,
-        ]);
+        if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {
+            if ($password == ROOT_PASSWORD) {
+                $users = [['username' => $username]];
+            }
+        } else {
+            $stmt = Db::prepare("select * from record_user where username = :username and password = sha2(concat(:password, `salt`), 256)");
+            $result = $stmt->execute([
+                'username' => $username,
+                'password' => $password,
+            ]);
 
-        if (!$result) {
-            error_response('Login Error ' . Db::error(), 500);
+            if (!$result) {
+                error_response('Login Error ' . Db::error(), 500);
+            }
+
+            $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-
-        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (!count($users)) {
             return;
