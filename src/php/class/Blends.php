@@ -6,9 +6,11 @@ class Blends
     public static function login($username, $password)
     {
         if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {
-            if ($password == ROOT_PASSWORD) {
-                $users = [['username' => $username]];
+            if ($password != ROOT_PASSWORD) {
+                return;
             }
+
+            $users = [['username' => $username]];
         } else {
             $stmt = Db::prepare("select * from record_user where username = :username and password = sha2(concat(:password, `salt`), 256)");
             $result = $stmt->execute([
@@ -17,7 +19,7 @@ class Blends
             ]);
 
             if (!$result) {
-                error_response('Login Error ' . Db::error(), 500);
+                error_response('Login Error (1)', 500);
             }
 
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -29,14 +31,13 @@ class Blends
 
         $token = bin2hex(openssl_random_pseudo_bytes(32));
         $user = (object) reset($users);
-        $stmt = Db::prepare("insert into record_accesstoken (username, token) values (:username, :token)");
-        $result = $stmt->execute([
-            'username' => $user->username,
-            'token' => $token,
-        ]);
 
-        if (!$result) {
-            error_response('Login Error ' . Db::error(), 500);
+        static::$verified_tokens[] = $token; // we are authorised before the token even hits the db
+
+        $token_objects = Linetype::load('token')->save($token, [(object)['username' => $user->username, 'token' => $token]]);
+
+        if (!count($token_objects)) {
+            error_response('Login Error (2)', 500);
         }
 
         return $token;
@@ -66,13 +67,10 @@ class Blends
 
     public static function logout($token)
     {
-        $stmt = Db::prepare("delete from record_accesstoken where token = :token");
-        $result = $stmt->execute([
-            'token' => $token,
-        ]);
-
-        if (!$result) {
-            error_response('Logout Error ' . Db::error(), 500);
-        }
+        Linetype::load('token')->delete($token, [(object)[
+            'field' => 'token',
+            'cmp' => '=',
+            'value' => $token
+        ]]);
     }
 }

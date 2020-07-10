@@ -33,7 +33,14 @@ class token extends \Linetype
             ],
         ];
         $this->unfuse_fields = [
+            '{t}.username' => ':{t}_username',
+            '{t}.token' => ':{t}_token',
             '{t}.ttl' => ':{t}_ttl',
         ];
+    }
+
+    function complete($line)
+    {
+        $line->ttl = $line->ttl ?? 3600;
     }
 }
