@@ -1,4 +1,32 @@
 <?php
+$config = Config::get();
+
+foreach (['linetypes', 'blends', 'tables'] as $listname) {
+    if (!property_exists($config, $listname)) {
+        $config->{$listname} = [];
+    }
+}
+
+if (!in_array('user', array_keys($config->tables))) {
+    error_response('User table not defined');
+}
+
+if (!in_array('user', array_keys($config->linetypes))) {
+    $config->linetypes['user'] = 'blends\\linetype\\user';
+}
+
+if (!in_array('token', array_keys($config->linetypes))) {
+    $config->linetypes['token'] = 'blends\\linetype\\token';
+}
+
+if (!in_array('users', array_keys($config->blends))) {
+    $config->blends['users'] = 'blends\\blend\\users';
+}
+
+if (!in_array('tokens', array_keys($config->blends))) {
+    $config->blends['tokens'] = 'blends\\blend\\tokens';
+}
+
 Db::connect();
 
 const ESC = "\x1b";

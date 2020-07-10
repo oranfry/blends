@@ -1,12 +1,12 @@
 <?php
 namespace blends\blend;
 
-class users extends \Blend
+class tokens extends \Blend
 {
     public function __construct()
     {
-        $this->label = 'Users';
-        $this->linetypes = ['user'];
+        $this->label = 'Tokens';
+        $this->linetypes = ['token'];
         $this->fields = [
             (object) [
                 'name' => 'icon',
@@ -14,8 +14,16 @@ class users extends \Blend
                 'derived' => true,
             ],
             (object) [
+                'name' => 'token',
+                'type' => 'text',
+            ],
+            (object) [
                 'name' => 'username',
                 'type' => 'text',
+            ],
+            (object) [
+                'name' => 'ttl',
+                'type' => 'number',
             ],
         ];
         $this->showass = ['list'];
