@@ -49,6 +49,21 @@ class Blends
         return $token;
     }
 
+    public static function token_username($token, $query_token)
+    {
+        $tokens = Linetype::load('token')->find_lines($token, [(object)[
+            'field' => 'token',
+            'cmp' => '=',
+            'value' => $query_token
+        ]]);
+
+        if (!count($tokens)) {
+            return;
+        }
+
+        return reset($tokens)->username;
+    }
+
     public static function verify_token($token)
     {
         $dbtable = @Config::get()->tables['token'];
