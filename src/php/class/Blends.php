@@ -12,6 +12,16 @@ class Blends
         }
 
         if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {
+            if (
+                !defined('ROOT_PASSWORD')
+                ||
+                !is_string(ROOT_PASSWORD)
+                ||
+                strlen(ROOT_PASSWORD) < 6
+            ) {
+                error_response('Root password insufficient: must be string of length 6 or more');
+            }
+
             if ($password != ROOT_PASSWORD) {
                 return;
             }
