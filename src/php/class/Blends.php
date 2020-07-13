@@ -47,11 +47,12 @@ class Blends
 
         $token = bin2hex(openssl_random_pseudo_bytes(32));
         $user = (object) reset($users);
+        $token_object = (object)['username' => $user->username, 'token' => $token];
 
-        static::$verified_tokens[] = $token; // we are authorised before the token even hits the db
+        static::$verified_tokens[$token] = $token_object; // we are authorised before the token even hits the db
 
         if (!$one_time) {
-            $token_objects = Linetype::load('token')->save($token, [(object)['username' => $user->username, 'token' => $token]]);
+            $token_objects = Linetype::load('token')->save($token, [$token_object]);
 
             if (!count($token_objects)) {
                 error_response('Login Error (3)', 500);
@@ -61,19 +62,13 @@ class Blends
         return $token;
     }
 
-    public static function token_username($token, $query_token)
+    public static function token_username($token)
     {
-        $tokens = Linetype::load('token')->find_lines($token, [(object)[
-            'field' => 'token',
-            'cmp' => '=',
-            'value' => $query_token
-        ]]);
-
-        if (!count($tokens)) {
+        if (!static::verify_token($token)) {
             return;
         }
 
-        return reset($tokens)->username;
+        return static::$verified_tokens[$token]->username;
     }
 
     public static function verify_token($token)
@@ -84,7 +79,7 @@ class Blends
             error_response('Login Error (1)', 500);
         }
 
-        if (in_array($token, static::$verified_tokens)) {
+        if (isset(static::$verified_tokens[$token])) {
             return true;
         }
 
@@ -94,14 +89,39 @@ class Blends
         ]);
 
         if (!$result) {
-            error_response('Token Verification Error ' . implode(' - ', $stmt->errorInfo()), 500);
+            error_response('Token Verification Error (1)' . implode(' - ', $stmt->errorInfo()), 500);
         }
 
-        if ($stmt->rowCount() > 0) {
-            static::$verified_tokens[] = $token;
+        if (!$stmt->rowCount()) {
+            return;
         }
 
-        return $stmt->rowCount() > 0;
+        $stmt = Db::prepare("select username from {$dbtable} where token = :token");
+        $result = $stmt->execute([
+            'token' => $token,
+        ]);
+
+        if (!$result) {
+            error_response('Token Verification Error (2)' . implode(' - ', $stmt->errorInfo()), 500);
+        }
+
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!count($users)) {
+            error_response('Token Verification Error (3)' . implode(' - ', $stmt->errorInfo()), 500);
+        }
+
+        if (count($users) > 1) {
+            error_response('Token Verification Error (4)' . implode(' - ', $stmt->errorInfo()), 500);
+        }
+
+        $user = reset($users);
+
+        $token_object = (object)['token' => $token, 'username' => $user['username']];
+
+        static::$verified_tokens[$token] = $token_object;
+
+        return true;
     }
 
     public static function logout($token)
