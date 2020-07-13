@@ -3,7 +3,7 @@ class Blends
 {
     public static $verified_tokens = [];
 
-    public static function login($username, $password)
+    public static function login($username, $password, $one_time = false)
     {
         $dbtable = @Config::get()->tables['user'];
 
@@ -50,10 +50,12 @@ class Blends
 
         static::$verified_tokens[] = $token; // we are authorised before the token even hits the db
 
-        $token_objects = Linetype::load('token')->save($token, [(object)['username' => $user->username, 'token' => $token]]);
+        if (!$one_time) {
+            $token_objects = Linetype::load('token')->save($token, [(object)['username' => $user->username, 'token' => $token]]);
 
-        if (!count($token_objects)) {
-            error_response('Login Error (3)', 500);
+            if (!count($token_objects)) {
+                error_response('Login Error (3)', 500);
+            }
         }
 
         return $token;
