@@ -3,39 +3,68 @@ class Blends
 {
     public static $verified_tokens = [];
 
+    public static function validate_username($username)
+    {
+        return
+            is_string($username)
+            &&
+            strlen($username) > 0
+            &&
+            (
+                preg_match('/^[a-z0-9_]+$/', $username)
+                ||
+                filter_var($username, FILTER_VALIDATE_EMAIL) !== false
+            )
+            ;
+    }
+
+    public static function validate_password($password)
+    {
+        return
+            is_string($password)
+            &&
+            strlen($password) > 5
+            ;
+    }
+
     public static function login($username, $password, $one_time = false)
     {
         $dbtable = @Config::get()->tables['user'];
 
         if (!$dbtable) {
-            error_response('Login Error (1)', 500);
+            error_response('User table not set up', 500);
+        }
+
+        if (!static::validate_username($username)) {
+            error_response('Invalid username');
+        }
+
+        if (!static::validate_password($password)) {
+            error_response('Invalid password');
         }
 
         if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {
-            if (
-                !defined('ROOT_PASSWORD')
-                ||
-                !is_string(ROOT_PASSWORD)
-                ||
-                strlen(ROOT_PASSWORD) < 6
-            ) {
-                error_response('Root password insufficient: must be string of length 6 or more');
+            if (!defined('ROOT_PASSWORD')) {
+                error_response('Root username is set up without a root password');
             }
 
-            if ($password != ROOT_PASSWORD) {
+            if ($password !== ROOT_PASSWORD) {
                 return;
+            }
+
+            if (!static::validate_password(ROOT_PASSWORD)) {
+                error_response('Root password is set to an invalid value and so cannot be used to log in');
             }
 
             $users = [['username' => $username]];
         } else {
-            $stmt = Db::prepare("select * from {$dbtable} where username = :username and password = sha2(concat(:password, `salt`), 256)");
-            $result = $stmt->execute([
+            $stmt = Db::prepare("select * from {$dbtable} where username = :username and password is not null and password = sha2(concat(:password, `salt`), 256)");            $result = $stmt->execute([
                 'username' => $username,
                 'password' => $password,
             ]);
 
             if (!$result) {
-                error_response('Login Error (2)', 500);
+                error_response('Login Error (1)', 500);
             }
 
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -55,7 +84,7 @@ class Blends
             $token_objects = Linetype::load('token')->save($token, [$token_object]);
 
             if (!count($token_objects)) {
-                error_response('Login Error (3)', 500);
+                error_response('Login Error (2)', 500);
             }
         }
 

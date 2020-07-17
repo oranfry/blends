@@ -254,13 +254,16 @@ class Linetype
                     }
                 }
 
+                // $updates[] = 't.user = :t_user';
+
                 sort($needed_vars);
                 $needed_vars = array_unique($needed_vars);
 
                 $joins = [];
+                $wheres = [];
                 $selects = []; // ignore
 
-                $this->_find_r($token, 't', $selects, $joins);
+                $this->_find_r($token, 't', $selects, $joins, $wheres);
 
                 $join = implode(' ', $joins);
                 $set = implode(', ', $updates);
@@ -273,6 +276,8 @@ class Linetype
                 foreach ($needed_vars as $nv) {
                     $querydata[$nv] = $data[$nv] ?: null;
                 }
+
+                // $querydata['t_user'] = $line->user;
 
                 $result = $stmt->execute($querydata);
 
@@ -420,10 +425,6 @@ class Linetype
 
     private function _find_lines($token, $filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
     {
-        // if (is_array($token) || $token === null) {
-        //     error_response('find_lines: pass token as first arg');
-        // }
-
         if (!Blends::verify_token($token)) {
             return false;
         }
@@ -445,7 +446,7 @@ class Linetype
         foreach ($filters as $filter) {
             $cmp = @$filter->cmp ?: '=';
 
-            if ((function($linetype, $filter) {
+            $is_parentage_filter = (function($linetype, $filter) {
                 foreach ($linetype->find_incoming_links() as $parent) {
                     $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
 
@@ -453,9 +454,11 @@ class Linetype
                         return true;
                     }
                 }
-            })($this, $filter)) {
+            })($this, $filter);
+
+            if ($is_parentage_filter) {
                 $cmpvalue = is_array($filter->value) ? 'in (' . implode(', ', $filter->value) . ')' : ' = ' . $filter->value;
-                $wheres[] = "t_{$filter->field}.id = {$filter->value}";
+                $wheres[] = "t_{$filter->field}.id {$cmpvalue}";
                 continue;
             }
 
@@ -505,7 +508,7 @@ class Linetype
             $wheres[] = str_replace('{t}', 't', $clause);
         }
 
-        $this->_find_r($token, 't', $selects, $joins, $summary);
+        $this->_find_r($token, 't', $selects, $joins, $wheres, $summary);
 
         if ($parentLink && $parentId) {
             $tablelink = Tablelink::load($parentLink);
@@ -544,10 +547,17 @@ class Linetype
         return $lines;
     }
 
-    private function _find_r($token, $alias, &$selects, &$joins, $summary = false)
+    private function _find_r($token, $alias, &$selects, &$joins, &$wheres, $summary = false)
     {
         if (!$summary) {
             $selects[] = "{$alias}.id {$alias}_id";
+            $selects[] = "{$alias}.user {$alias}_user";
+        }
+
+        $username = Blends::token_username($token);
+
+        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+            $wheres[] = "{$alias}.user = '{$username}'";
         }
 
         foreach ($this->fields as $field) {
@@ -577,7 +587,7 @@ class Linetype
                 continue;
             }
 
-            $childlinetype->_find_r($token, $childalias, $selects, $joins, $summary);
+            $childlinetype->_find_r($token, $childalias, $selects, $joins, $wheres, $summary);
         }
 
         if (!$summary) {
@@ -598,6 +608,7 @@ class Linetype
     {
         if (!$summary) {
             $line->id = $row["{$alias}_id"];
+            $line->user = $row["{$alias}_user"];
         }
 
         foreach ($this->fields as $field) {
@@ -781,6 +792,16 @@ class Linetype
 
     private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $level, $timestamp)
     {
+        $username = Blends::token_username($token);
+
+        if (!empty($line) && !is_object($line)) {
+            error_response('Lines must be objects');
+        }
+
+        if (!empty($oldline) && !is_object($oldline)) {
+            error_response('Old lines must be objects');
+        }
+
         foreach ($this->unfuse_fields as $field => $expression) {
             $field_full = str_replace('{t}', $alias, $field);
 
@@ -790,10 +811,21 @@ class Linetype
             }
         }
 
+        $unfuse_fields["{$alias}.user"] = ":{$alias}_user";
+
         $is = is_object($line) && !(@$line->_is === false);
         $was = is_object($oldline);
 
         if ($is) {
+            error_log($this->name . ' ' . @$line->user);
+            if (!property_exists($line, 'user') || !$line->user) {
+                $line->user = @$oldline->user ?? $username;
+            }
+
+            if ($username != $line->user && (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME)) {
+                error_response('You do not have permission to act as another user');
+            }
+
             $this->complete($line);
 
             foreach ($this->fields as $field) {
@@ -805,6 +837,8 @@ class Linetype
                     $data["{$alias}_{$field->name}"] = $line->{$field->name};
                 }
             }
+
+            $data["{$alias}_user"] = $line->user;
 
             $errors = $this->validate($line);
 
