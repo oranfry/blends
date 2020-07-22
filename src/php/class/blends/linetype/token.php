@@ -6,14 +6,14 @@ class token extends \Linetype
     function __construct()
     {
         $this->label = 'Token';
-        $this->icon = 'doc';
+        $this->icon = 'ticket';
         $this->table = 'token';
         $this->showass = ['list'];
         $this->fields = [
             (object) [
                 'name' => 'icon',
                 'type' => 'icon',
-                'fuse' => "'person'",
+                'fuse' => "'ticket'",
                 'derived' => true,
             ],
             (object) [

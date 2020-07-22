@@ -6,14 +6,14 @@ class group extends \Linetype
     function __construct()
     {
         $this->label = 'Group';
-        $this->icon = 'doc';
+        $this->icon = 'people';
         $this->table = 'group';
         $this->showass = ['list'];
         $this->fields = [
             (object) [
                 'name' => 'icon',
                 'type' => 'icon',
-                'fuse' => "'doc'",
+                'fuse' => "'people'",
                 'derived' => true,
             ],
             (object) [
