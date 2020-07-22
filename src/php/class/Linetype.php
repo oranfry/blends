@@ -277,7 +277,7 @@ class Linetype
                     $querydata[$nv] = $data[$nv] ?: null;
                 }
 
-                // $querydata['t_user'] = $line->user;
+                // $querydata['username'] = $line->user;
 
                 $result = $stmt->execute($querydata);
 
@@ -429,8 +429,8 @@ class Linetype
             return false;
         }
 
+        $username = Blends::token_username($token);
         $filters = $filters ?? [];
-
         $dbtable = @Config::get()->tables[$this->table];
 
         if (!$dbtable) {
@@ -516,21 +516,31 @@ class Linetype
             $wheres[] = "parent.id = {$parentId}";
         }
 
+        // top-level join to logged-in user and groups
+
+        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+            $joins[] = "join record_user u on u.username = :username";
+            $joins[] = "left join tablelink_group_user gm on gm.user_id = u.id";
+            $joins[] = "left join record_group g on g.id = gm.group_id";
+        }
+
         $select = implode(', ', $selects);
         $join = implode(' ', $joins);
         $where = count($wheres) ? 'where ' . implode(' AND ', array_map(function($c){ return "({$c})"; }, $wheres)) : '';
         $orderby = implode(', ', $orderbys);
 
         $q = "select {$select} from `{$dbtable}` t {$join} {$where} order by {$orderby}";
-        $r = Db::succeed($q);
 
-        if (!$r) {
-            error_response(Db::error() . "\n\n$q\n\nlinetype: \"{$this->name}\"", 500);
+        $stmt = Db::prepare($q);
+        $result = $stmt->execute(['username' => $username]);
+
+        if (!$result) {
+            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
         }
 
         $lines = [];
 
-        while ($row = mysqli_fetch_assoc($r)) {
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $line = (object) [];
 
             $line->type = $this->name;
@@ -555,10 +565,6 @@ class Linetype
         }
 
         $username = Blends::token_username($token);
-
-        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
-            $wheres[] = "{$alias}.user = '{$username}'";
-        }
 
         foreach ($this->fields as $field) {
             if ($summary && !@$field->summary == 'sum') {
@@ -601,6 +607,10 @@ class Linetype
                 $joins[] = make_join($tablelink, $parentalias, $alias, $side, $leftJoin);
                 $selects[] = "{$parentalias}.id {$parentalias}_id";
             }
+        }
+
+        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+            $wheres[] = "{$alias}.group = g.groupname or {$alias}.user = u.username";
         }
     }
 
@@ -817,13 +827,16 @@ class Linetype
         $was = is_object($oldline);
 
         if ($is) {
-            error_log($this->name . ' ' . @$line->user);
-            if (!property_exists($line, 'user') || !$line->user) {
-                $line->user = @$oldline->user ?? $username;
-            }
+            if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {
+                if (!property_exists($line, 'user') && $was) {
+                    $line->user = $oldline->user;
+                }
+            } else {
+                $line->user = $was ? $oldline->user : $username;
 
-            if ($username != $line->user && (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME)) {
-                error_response('You do not have permission to act as another user');
+                if ($username != $line->user) {
+                    error_response('You do not have permission to update this ' . $this->name);
+                }
             }
 
             $this->complete($line);
