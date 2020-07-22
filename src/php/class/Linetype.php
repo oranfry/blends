@@ -851,7 +851,7 @@ class Linetype
                 }
             }
 
-            $data["{$alias}_user"] = $line->user;
+            $data["{$alias}_user"] = @$line->user;
 
             $errors = $this->validate($line);
 
