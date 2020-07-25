@@ -486,7 +486,7 @@ class Linetype
         foreach ($filters as $filter) {
             $cmp = @$filter->cmp ?: '=';
 
-            if ((function($linetype, $filter) {
+            $is_parentage_filter = (function($linetype, $filter) {
                 foreach ($linetype->find_incoming_links() as $parent) {
                     $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
 
