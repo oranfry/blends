@@ -154,3 +154,27 @@ function commit($timestamp, $linetype, $data)
 
     Db::succeed('update master_record_lock set counter = counter + 1');
 }
+
+function n2h($table, $n)
+{
+    // Generate a sequence secret: php -r 'echo base64_encode(random_bytes(32)) . "\n";'
+
+    $banned = @Config::get()->sequence->banned_chars ?? [];
+    $replace = array_fill(0, count($banned), '');
+    $sequence_secret = @Config::get()->sequence->secret;
+    $table_subs = @Config::get()->sequence->subs[$table] ?? [];
+
+    if (!$sequence_secret) {
+        error_response('Sequence Secret not defined');
+    }
+
+    if (strlen($sequence_secret) < 8) {
+        error_response('Sequence Secret too weak (8-char minimum)');
+    }
+
+    if (isset($table_subs[$n])) {
+        return $table_subs[$n];
+    }
+
+    return strtoupper(substr(str_replace($banned, $replace, base64_encode(hex2bin(hash('sha256', $n . '--' . $table . '--' . $sequence_secret)))), 0, 10));
+}

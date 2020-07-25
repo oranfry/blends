@@ -184,6 +184,12 @@ class Linetype
 
     private function _save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
     {
+        $sequence = @Config::get()->sequence;
+
+        if (!$sequence) {
+            error_response("Sequences not set up");
+        }
+
         if (!$timestamp) {
             $timestamp = date('Y-m-d H:i:s');
         }
@@ -216,12 +222,51 @@ class Linetype
             $data = [];
             $statements = [];
             $ids = [];
-            $oldline = @$line->id ? $oldlines[$line->id] : null;
+            $oldline = @$line->id ? @$oldlines[$line->id] : null;
 
             $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
 
             foreach ($statements as $statement) {
                 @list($query, $querydata, $saveto) = $statement;
+
+                if ($saveto) {
+                    $stmt = Db::prepare("select pointer from sequence_pointer where `table` = :table for update");
+                    $result = $stmt->execute(['table' => $this->table]);
+
+                    if (!$result) {
+                        error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                    }
+
+                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                    if (!$row) {
+                        error_log("Sequence for table {$this->table} not initialised");
+                    }
+
+                    $inc = 1;
+                    $pointer = $row['pointer'];
+                    $table_collisions = @$sequence->collisions[$this->table] ?? [];
+
+                    while (in_array($pointer, $table_collisions)) {
+                        $pointer++;
+                        $inc++;
+                    }
+
+                    if ($pointer > @$sequence->max ?? 1) {
+                        error_response("Sequence for table {$this->table} exhausted");
+                    }
+
+                    $id = n2h($this->table, $pointer);
+                    $ids[$saveto] = $id;
+                    $querydata[$saveto] = $id;
+
+                    $stmt = Db::prepare("update sequence_pointer set pointer = pointer + :inc where `table` = :table");
+                    $result = $stmt->execute(['table' => $this->table, 'inc' => $inc]);
+
+                    if (!$result) {
+                        error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                    }
+                }
 
                 preg_match_all('/:([a-z_]+_id)/', $query, $matches);
 
@@ -234,10 +279,6 @@ class Linetype
 
                 if (!$result) {
                     error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
-                }
-
-                if ($saveto) {
-                    $ids[$saveto] = Db::pdo_insert_id();
                 }
             }
 
@@ -453,9 +494,11 @@ class Linetype
                         return true;
                     }
                 }
-            })($this, $filter)) {
-                $cmpvalue = is_array($filter->value) ? 'in (' . implode(', ', $filter->value) . ')' : ' = ' . $filter->value;
-                $wheres[] = "t_{$filter->field}.id = {$filter->value}";
+            })($this, $filter);
+
+            if ($is_parentage_filter) {
+                $cmpvalue = is_array($filter->value) ? 'in (' . implode(', ', array_map(function($v){ return "'{$v}'"; }, $filter->value)) . ')' : ' = ' . "'{$filter->value}'";
+                $wheres[] = "t_{$filter->field}.id {$cmpvalue}";
                 continue;
             }
 
@@ -510,7 +553,7 @@ class Linetype
         if ($parentLink && $parentId) {
             $tablelink = Tablelink::load($parentLink);
             $joins[] = make_join($tablelink, 'parent', 't', 0, false);
-            $wheres[] = "parent.id = {$parentId}";
+            $wheres[] = "parent.id = '{$parentId}'";
         }
 
         $select = implode(', ', $selects);
@@ -828,6 +871,9 @@ class Linetype
             $values = [];
             $needed_vars = [];
 
+            $fields[] = 'id';
+            $values[] = ":{$alias}_id";
+
             foreach ($unfuse_fields as $field => $expression) {
                 if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
                     $fields[] = $groups[1];
@@ -1104,8 +1150,7 @@ class Linetype
             error_response("No path defined for file field {$this->name}.{$field->name}");
         }
 
-        $hash = md5($field->path . ':' . $line->id);
-        $intermediate = substr($hash, 0, 3);
+        $intermediate = substr($line->id, 0, 3);
 
         return "{$field->path}/{$intermediate}/{$line->id}.pdf";
     }
