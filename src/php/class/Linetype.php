@@ -226,6 +226,8 @@ class Linetype
 
             $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
 
+            masterlog_check();
+
             foreach ($statements as $statement) {
                 @list($query, $querydata, $statement_table, $saveto) = $statement;
 

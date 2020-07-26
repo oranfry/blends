@@ -150,22 +150,45 @@ function dir_is_empty($dir)
     return true;
 }
 
-function commit($timestamp, $linetype, $data)
+function masterlog_check()
 {
-    Db::succeed('start transaction');
-    Db::succeed('select counter from master_record_lock for update');
+    $result = Db::succeed('select counter from master_record_lock');
+
+    if (!$result) {
+        error_response('Master record lock not set up correctly - table error');
+    }
+
+    $count = 0;
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $count++;
+    }
+
+    if ($count < 1) {
+        error_response('Master record lock not set up correctly - no row');
+    }
+
+    if ($count > 1) {
+        error_response('Master record lock not set up correctly - multiple rows');
+    }
 
     $master_record_file = @Config::get()->master_record_file;
 
     if (!$master_record_file) {
-        Db::succeed('rollback');
         error_response('Master record file not configured');
     }
 
     if (!touch($master_record_file) || !is_writable($master_record_file)) {
         error_response('Master record file not writable');
     }
+}
 
+function commit($timestamp, $linetype, $data)
+{
+    Db::succeed('start transaction');
+    Db::succeed('select counter from master_record_lock for update');
+
+    $master_record_file = @Config::get()->master_record_file;
     $export = $timestamp . ' ' . $linetype . ' ' . json_encode($data);
 
     file_put_contents($master_record_file, $export . "\n", FILE_APPEND);
