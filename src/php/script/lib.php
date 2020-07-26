@@ -144,12 +144,17 @@ function commit($timestamp, $linetype, $data)
     Db::succeed('select counter from master_record_lock for update');
 
     $master_record_file = @Config::get()->master_record_file;
-    $export = $timestamp . ' ' . $linetype . ' ' . json_encode($data);
 
     if (!$master_record_file) {
         Db::succeed('rollback');
         error_response('Master record file not configured');
     }
+
+    if (!touch($master_record_file) || !is_writable($master_record_file)) {
+        error_response('Master record file not writable');
+    }
+
+    $export = $timestamp . ' ' . $linetype . ' ' . json_encode($data);
 
     file_put_contents($master_record_file, $export . "\n", FILE_APPEND);
 
