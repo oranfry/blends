@@ -489,7 +489,7 @@ class Linetype
         $selects = [];
         $joins = [];
         $wheres = [];
-        $orderbys = ['t.id'];
+        $orderbys = ['t.created'];
         $groupbys = [];
 
         foreach ($filters as $filter) {
