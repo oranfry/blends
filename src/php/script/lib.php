@@ -152,17 +152,48 @@ function dir_is_empty($dir)
 
 function commit($timestamp, $linetype, $data)
 {
+    Db::succeed('start transaction');
     Db::succeed('select counter from master_record_lock for update');
 
     $master_record_file = @Config::get()->master_record_file;
-    $export = $timestamp . ' ' . $linetype . ' ' . json_encode($data);
 
     if (!$master_record_file) {
+        Db::succeed('rollback');
         error_response('Master record file not configured');
-        return;
     }
+
+    if (!touch($master_record_file) || !is_writable($master_record_file)) {
+        error_response('Master record file not writable');
+    }
+
+    $export = $timestamp . ' ' . $linetype . ' ' . json_encode($data);
 
     file_put_contents($master_record_file, $export . "\n", FILE_APPEND);
 
     Db::succeed('update master_record_lock set counter = counter + 1');
+    Db::succeed('commit');
+}
+
+function n2h($table, $n)
+{
+    // Generate a sequence secret: php -r 'echo base64_encode(random_bytes(32)) . "\n";'
+
+    $banned = @Config::get()->sequence->banned_chars ?? [];
+    $replace = array_fill(0, count($banned), '');
+    $sequence_secret = @Config::get()->sequence->secret;
+    $table_subs = @Config::get()->sequence->subs[$table] ?? [];
+
+    if (!$sequence_secret) {
+        error_response('Sequence Secret not defined');
+    }
+
+    if (strlen($sequence_secret) < 8) {
+        error_response('Sequence Secret too weak (8-char minimum)');
+    }
+
+    if (isset($table_subs[$n])) {
+        return $table_subs[$n];
+    }
+
+    return strtoupper(substr(str_replace($banned, $replace, base64_encode(hex2bin(hash('sha256', $n . '--' . $table . '--' . $sequence_secret)))), 0, 10));
 }
