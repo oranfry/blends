@@ -140,19 +140,21 @@ function dir_is_empty($dir)
 
 function commit($timestamp, $linetype, $data)
 {
+    Db::succeed('start transaction');
     Db::succeed('select counter from master_record_lock for update');
 
     $master_record_file = @Config::get()->master_record_file;
     $export = $timestamp . ' ' . $linetype . ' ' . json_encode($data);
 
     if (!$master_record_file) {
+        Db::succeed('rollback');
         error_response('Master record file not configured');
-        return;
     }
 
     file_put_contents($master_record_file, $export . "\n", FILE_APPEND);
 
     Db::succeed('update master_record_lock set counter = counter + 1');
+    Db::succeed('commit');
 }
 
 function n2h($table, $n)
