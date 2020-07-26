@@ -227,25 +227,28 @@ class Linetype
             $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
 
             foreach ($statements as $statement) {
-                @list($query, $querydata, $saveto) = $statement;
+                @list($query, $querydata, $statement_table, $saveto) = $statement;
 
                 if ($saveto) {
+                    Db::succeed('start transaction');
                     $stmt = Db::prepare("select pointer from sequence_pointer where `table` = :table for update");
-                    $result = $stmt->execute(['table' => $this->table]);
+                    $result = $stmt->execute(['table' => $statement_table]);
 
                     if (!$result) {
+                        Db::succeed('rollback');
                         error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                     }
 
                     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     if (!$row) {
-                        error_log("Sequence for table {$this->table} not initialised");
+                        Db::succeed('rollback');
+                        error_log("Sequence for table {$statement_table} not initialised");
                     }
 
                     $inc = 1;
                     $pointer = $row['pointer'];
-                    $table_collisions = @$sequence->collisions[$this->table] ?? [];
+                    $table_collisions = @$sequence->collisions[$statement_table] ?? [];
 
                     while (in_array($pointer, $table_collisions)) {
                         $pointer++;
@@ -253,19 +256,23 @@ class Linetype
                     }
 
                     if ($pointer > @$sequence->max ?? 1) {
-                        error_response("Sequence for table {$this->table} exhausted");
+                        Db::succeed('rollback');
+                        error_response("Sequence for table {$statement_table} exhausted");
                     }
 
-                    $id = n2h($this->table, $pointer);
+                    $id = n2h($statement_table, $pointer);
                     $ids[$saveto] = $id;
                     $querydata[$saveto] = $id;
 
                     $stmt = Db::prepare("update sequence_pointer set pointer = pointer + :inc where `table` = :table");
-                    $result = $stmt->execute(['table' => $this->table, 'inc' => $inc]);
+                    $result = $stmt->execute(['table' => $statement_table, 'inc' => $inc]);
 
                     if (!$result) {
+                        Db::succeed('rollback');
                         error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                     }
+
+                    Db::succeed('commit');
                 }
 
                 preg_match_all('/:([a-z_]+_id)/', $query, $matches);
@@ -907,7 +914,7 @@ class Linetype
                 $querydata['created'] = $timestamp;
             }
 
-            $statements[] = [$q, $querydata, "{$alias}_id"];
+            $statements[] = [$q, $querydata, $this->table, "{$alias}_id"];
 
             if ($tablelink) {
                 $q = "insert into {$tablelink->middle_table} ({$tablelink->ids[0]}_id, {$tablelink->ids[1]}_id) values (:{$parentalias}_id, :{$alias}_id)";
