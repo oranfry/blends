@@ -58,7 +58,8 @@ class Blends
 
             $users = [['username' => $username]];
         } else {
-            $stmt = Db::prepare("select * from {$dbtable} where username = :username and password is not null and password = sha2(concat(:password, `salt`), 256)");            $result = $stmt->execute([
+            $stmt = Db::prepare("select * from {$dbtable} where username = :username and password is not null and password = sha2(concat(:password, `salt`), 256)");
+            $result = $stmt->execute([
                 'username' => $username,
                 'password' => $password,
             ]);

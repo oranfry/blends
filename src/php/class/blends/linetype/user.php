@@ -1,5 +1,6 @@
 <?php
 namespace blends\linetype;
+use \Blends;
 
 class user extends \Linetype
 {
@@ -32,5 +33,16 @@ class user extends \Linetype
             '{t}.salt' => 'if (:{t}_updatepassword is null, {t}.salt, substring(md5(rand()), 1, 4))',
             '{t}.password' => 'if (:{t}_updatepassword is null, {t}.password, sha2(concat(:{t}_updatepassword, {t}.salt), 256))',
         ];
+    }
+
+    function validate($line)
+    {
+        $errors = [];
+
+        if (@$line->updatepassword && !Blends::validate_password($line->updatepassword)) {
+            $errors[] = "Invalid password";
+        }
+
+        return $errors;
     }
 }

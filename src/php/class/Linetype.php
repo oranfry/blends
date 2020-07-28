@@ -245,7 +245,7 @@ class Linetype
 
                     if (!$row) {
                         Db::succeed('rollback');
-                        error_log("Sequence for table {$statement_table} not initialised");
+                        error_response("Sequence for table {$statement_table} not initialised");
                     }
 
                     $inc = 1;
