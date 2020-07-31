@@ -17,7 +17,7 @@ class Linetype
 
     public static function load($name)
     {
-        $linetypeclass = @Config::get()->linetypes[$name];
+        $linetypeclass = @Config::get()->linetypes[$name]->class;
 
         if (!$linetypeclass) {
             error_response("No such linetype '{$name}'");
@@ -184,6 +184,10 @@ class Linetype
 
     private function _save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
     {
+        if (!@Config::get()->linetypes[$this->name]->canwrite) {
+            error_response("No write access for linetype {$this->name}");
+        }
+
         $sequence = @Config::get()->sequence;
 
         if (!$sequence) {
@@ -875,6 +879,20 @@ class Linetype
 
         $is = is_object($line) && !(@$line->_is === false);
         $was = is_object($oldline);
+
+        if ($is && !$was && $line->id) {
+            error_response("Cannot update: original line not found: {$this->name} {$line->id}");
+        }
+
+        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+            if ($is && !$was && !@Config::get()->linetypes[$this->name]->cancreate) {
+                error_response("No create access for linetype {$this->name}");
+            }
+
+            if (!$is && $was && !@Config::get()->linetypes[$this->name]->candelete) {
+                error_response("No delete access for linetype {$this->name}");
+            }
+        }
 
         if ($is) {
             if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {

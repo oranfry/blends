@@ -16,15 +16,15 @@ if (!in_array('group', array_keys($config->tables))) {
 }
 
 if (!in_array('user', array_keys($config->linetypes))) {
-    $config->linetypes['user'] = 'blends\\linetype\\user';
+    $config->linetypes['user'] = (object) ['canwrite' => true, 'class' => 'blends\\linetype\\user'];
 }
 
 if (!in_array('group', array_keys($config->linetypes))) {
-    $config->linetypes['group'] = 'blends\\linetype\\group';
+    $config->linetypes['group'] = (object) ['canwrite' => true, 'class' => 'blends\\linetype\\group'];
 }
 
 if (!in_array('token', array_keys($config->linetypes))) {
-    $config->linetypes['token'] = 'blends\\linetype\\token';
+    $config->linetypes['token'] = (object) ['cancreate' => true, 'canwrite' => true, 'class' => 'blends\\linetype\\token'];
 }
 
 if (!in_array('users', array_keys($config->blends))) {

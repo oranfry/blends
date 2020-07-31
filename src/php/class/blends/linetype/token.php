@@ -17,11 +17,6 @@ class token extends \Linetype
                 'derived' => true,
             ],
             (object) [
-                'name' => 'username',
-                'type' => 'text',
-                'fuse' => '{t}.username',
-            ],
-            (object) [
                 'name' => 'token',
                 'type' => 'text',
                 'fuse' => "{t}.token",
@@ -33,7 +28,6 @@ class token extends \Linetype
             ],
         ];
         $this->unfuse_fields = [
-            '{t}.username' => ':{t}_username',
             '{t}.token' => ':{t}_token',
             '{t}.ttl' => ':{t}_ttl',
         ];

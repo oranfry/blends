@@ -126,7 +126,7 @@ class Blends
             return;
         }
 
-        $stmt = Db::prepare("select username from {$dbtable} where token = :token");
+        $stmt = Db::prepare("select user from {$dbtable} where token = :token");
         $result = $stmt->execute([
             'token' => $token,
         ]);
@@ -147,7 +147,7 @@ class Blends
 
         $user = reset($users);
 
-        $token_object = (object)['token' => $token, 'username' => $user['username']];
+        $token_object = (object)['token' => $token, 'username' => $user['user'] ?? ROOT_USERNAME];
 
         static::$verified_tokens[$token] = $token_object;
 
