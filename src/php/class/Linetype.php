@@ -184,7 +184,13 @@ class Linetype
 
     private function _save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
     {
-        if (!@Config::get()->linetypes[$this->name]->canwrite) {
+        $username = Blends::token_username($token);
+
+        if (
+            (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME)
+            &&
+            !@Config::get()->linetypes[$this->name]->canwrite
+        ) {
             error_response("No write access for linetype {$this->name}");
         }
 
@@ -277,6 +283,8 @@ class Linetype
                         Db::succeed('rollback');
                         error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                     }
+
+                    error_log($this->name . ':' . $id);
 
                     Db::succeed('commit');
                 }
@@ -409,6 +417,11 @@ class Linetype
 
             foreach ($lines as $i => $line) {
                 $line_clone = $this->clone_r($line);
+                /**
+                 * This strips too much
+                 * If some child lines are being updated they will turn into
+                 * creations because their IDs will be stripped here
+                 */
                 $this->strip_r($line_clone);
 
                 if (isset($oldids[$i])) {
@@ -570,12 +583,10 @@ class Linetype
             $wheres[] = "parent.id = '{$parentId}'";
         }
 
-        // top-level join to logged-in user and groups
+        // top-level join to logged-in user
 
         if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
-            $joins[] = "join record_user u on u.username = :username";
-            $joins[] = "left join tablelink_group_user gm on gm.user_id = u.id";
-            $joins[] = "left join record_group g on g.id = gm.group_id";
+            $joins[] = "join record_user u on u.user = :username";
         }
 
         $select = implode(', ', $selects);
@@ -589,7 +600,7 @@ class Linetype
         $result = $stmt->execute(['username' => $username]);
 
         if (!$result) {
-            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}\n" . var_export($querydata, true));
         }
 
         $lines = [];
@@ -664,7 +675,7 @@ class Linetype
         }
 
         if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
-            $wheres[] = "{$alias}.group = g.groupname or {$alias}.user = u.username";
+            $wheres[] = "{$alias}.user = u.user";
         }
     }
 
@@ -880,7 +891,7 @@ class Linetype
         $is = is_object($line) && !(@$line->_is === false);
         $was = is_object($oldline);
 
-        if ($is && !$was && $line->id) {
+        if (!$was && @$line->id) {
             error_response("Cannot update: original line not found: {$this->name} {$line->id}");
         }
 

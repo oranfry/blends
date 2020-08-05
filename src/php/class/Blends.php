@@ -30,6 +30,7 @@ class Blends
     public static function login($username, $password, $one_time = false)
     {
         $dbtable = @Config::get()->tables['user'];
+        $allowed_users = @Config::get()->allowed_users;
 
         if (!$dbtable) {
             error_response('User table not set up', 500);
@@ -56,9 +57,9 @@ class Blends
                 error_response('Root password is set to an invalid value and so cannot be used to log in');
             }
 
-            $users = [['username' => $username]];
+            $users = [['t_user' => $username]];
         } else {
-            $stmt = Db::prepare("select * from {$dbtable} where username = :username and password is not null and password = sha2(concat(:password, `salt`), 256)");
+            $stmt = Db::prepare("select t.user t_user from {$dbtable} t where t.user = :username and t.password is not null and t.password = sha2(concat(:password, t.`salt`), 256)");
             $result = $stmt->execute([
                 'username' => $username,
                 'password' => $password,
@@ -75,9 +76,13 @@ class Blends
             return;
         }
 
+        if (is_array($allowed_users) && !in_array($username, $allowed_users)) {
+            return;
+        }
+
         $token = bin2hex(openssl_random_pseudo_bytes(32));
         $user = (object) reset($users);
-        $token_object = (object)['username' => $user->username, 'token' => $token];
+        $token_object = (object)['username' => $user->t_user, 'token' => $token];
 
         static::$verified_tokens[$token] = $token_object; // we are authorised before the token even hits the db
 

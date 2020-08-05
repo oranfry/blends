@@ -20,7 +20,8 @@ class user extends \Linetype
             (object) [
                 'name' => 'username',
                 'type' => 'text',
-                'fuse' => '{t}.username',
+                'fuse' => '{t}.user',
+                'derived' => true,
             ],
             (object) [
                 'name' => 'updatepassword',
@@ -29,7 +30,7 @@ class user extends \Linetype
             ],
         ];
         $this->unfuse_fields = [
-            '{t}.username' => ':{t}_username',
+            '{t}.user' => ':{t}_username',
             '{t}.salt' => 'if (:{t}_updatepassword is null, {t}.salt, substring(md5(rand()), 1, 4))',
             '{t}.password' => 'if (:{t}_updatepassword is null, {t}.password, sha2(concat(:{t}_updatepassword, {t}.salt), 256))',
         ];
