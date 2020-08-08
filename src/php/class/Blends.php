@@ -3,39 +3,70 @@ class Blends
 {
     public static $verified_tokens = [];
 
+    public static function validate_username($username)
+    {
+        return
+            is_string($username)
+            &&
+            strlen($username) > 0
+            &&
+            (
+                preg_match('/^[a-z0-9_]+$/', $username)
+                ||
+                filter_var($username, FILTER_VALIDATE_EMAIL) !== false
+            )
+            ;
+    }
+
+    public static function validate_password($password)
+    {
+        return
+            is_string($password)
+            &&
+            strlen($password) > 5
+            ;
+    }
+
     public static function login($username, $password, $one_time = false)
     {
         $dbtable = @Config::get()->tables['user'];
+        $allowed_users = @Config::get()->allowed_users;
 
         if (!$dbtable) {
-            error_response('Login Error (1)', 500);
+            error_response('User table not set up', 500);
+        }
+
+        if (!static::validate_username($username)) {
+            error_response('Invalid username');
+        }
+
+        if (!static::validate_password($password)) {
+            error_response('Invalid password');
         }
 
         if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {
-            if (
-                !defined('ROOT_PASSWORD')
-                ||
-                !is_string(ROOT_PASSWORD)
-                ||
-                strlen(ROOT_PASSWORD) < 6
-            ) {
-                error_response('Root password insufficient: must be string of length 6 or more');
+            if (!defined('ROOT_PASSWORD')) {
+                error_response('Root username is set up without a root password');
             }
 
-            if ($password != ROOT_PASSWORD) {
+            if ($password !== ROOT_PASSWORD) {
                 return;
             }
 
-            $users = [['username' => $username]];
+            if (!static::validate_password(ROOT_PASSWORD)) {
+                error_response('Root password is set to an invalid value and so cannot be used to log in');
+            }
+
+            $users = [['t_user' => $username]];
         } else {
-            $stmt = Db::prepare("select * from {$dbtable} where username = :username and password = sha2(concat(:password, `salt`), 256)");
+            $stmt = Db::prepare("select t.user t_user from {$dbtable} t where t.user = :username and t.password is not null and t.password = sha2(concat(:password, t.`salt`), 256)");
             $result = $stmt->execute([
                 'username' => $username,
                 'password' => $password,
             ]);
 
             if (!$result) {
-                error_response('Login Error (2)', 500);
+                error_response('Login Error (1)', 500);
             }
 
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -45,9 +76,13 @@ class Blends
             return;
         }
 
+        if (is_array($allowed_users) && !in_array($username, $allowed_users)) {
+            return;
+        }
+
         $token = bin2hex(openssl_random_pseudo_bytes(32));
         $user = (object) reset($users);
-        $token_object = (object)['username' => $user->username, 'token' => $token];
+        $token_object = (object)['username' => $user->t_user, 'token' => $token];
 
         static::$verified_tokens[$token] = $token_object; // we are authorised before the token even hits the db
 
@@ -55,7 +90,7 @@ class Blends
             $token_objects = Linetype::load('token')->save($token, [$token_object]);
 
             if (!count($token_objects)) {
-                error_response('Login Error (3)', 500);
+                error_response('Login Error (2)', 500);
             }
         }
 
@@ -96,7 +131,7 @@ class Blends
             return;
         }
 
-        $stmt = Db::prepare("select username from {$dbtable} where token = :token");
+        $stmt = Db::prepare("select user from {$dbtable} where token = :token");
         $result = $stmt->execute([
             'token' => $token,
         ]);
@@ -117,7 +152,7 @@ class Blends
 
         $user = reset($users);
 
-        $token_object = (object)['token' => $token, 'username' => $user['username']];
+        $token_object = (object)['token' => $token, 'username' => $user['user'] ?? ROOT_USERNAME];
 
         static::$verified_tokens[$token] = $token_object;
 

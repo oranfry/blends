@@ -17,7 +17,7 @@ class Linetype
 
     public static function load($name)
     {
-        $linetypeclass = @Config::get()->linetypes[$name];
+        $linetypeclass = @Config::get()->linetypes[$name]->class;
 
         if (!$linetypeclass) {
             error_response("No such linetype '{$name}'");
@@ -184,6 +184,16 @@ class Linetype
 
     private function _save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
     {
+        $username = Blends::token_username($token);
+
+        if (
+            (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME)
+            &&
+            !@Config::get()->linetypes[$this->name]->canwrite
+        ) {
+            error_response("No write access for linetype {$this->name}");
+        }
+
         $sequence = @Config::get()->sequence;
 
         if (!$sequence) {
@@ -245,7 +255,7 @@ class Linetype
 
                     if (!$row) {
                         Db::succeed('rollback');
-                        error_log("Sequence for table {$statement_table} not initialised");
+                        error_response("Sequence for table {$statement_table} not initialised");
                     }
 
                     $inc = 1;
@@ -273,6 +283,8 @@ class Linetype
                         Db::succeed('rollback');
                         error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                     }
+
+                    error_log($this->name . ':' . $id);
 
                     Db::succeed('commit');
                 }
@@ -304,13 +316,16 @@ class Linetype
                     }
                 }
 
+                // $updates[] = 't.user = :t_user';
+
                 sort($needed_vars);
                 $needed_vars = array_unique($needed_vars);
 
                 $joins = [];
+                $wheres = [];
                 $selects = []; // ignore
 
-                $this->_find_r($token, 't', $selects, $joins);
+                $this->_find_r($token, 't', $selects, $joins, $wheres);
 
                 $join = implode(' ', $joins);
                 $set = implode(', ', $updates);
@@ -323,6 +338,8 @@ class Linetype
                 foreach ($needed_vars as $nv) {
                     $querydata[$nv] = $data[$nv] ?: null;
                 }
+
+                // $querydata['username'] = $line->user;
 
                 $result = $stmt->execute($querydata);
 
@@ -402,10 +419,6 @@ class Linetype
                 $line_clone = $this->clone_r($line);
                 $this->strip_r($line_clone);
 
-                if (isset($oldids[$i])) {
-                    $line_clone->id = $oldids[$i];
-                }
-
                 $lines_clone[] = $line_clone;
             }
 
@@ -470,16 +483,12 @@ class Linetype
 
     private function _find_lines($token, $filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
     {
-        // if (is_array($token) || $token === null) {
-        //     error_response('find_lines: pass token as first arg');
-        // }
-
         if (!Blends::verify_token($token)) {
             return false;
         }
 
+        $username = Blends::token_username($token);
         $filters = $filters ?? [];
-
         $dbtable = @Config::get()->tables[$this->table];
 
         if (!$dbtable) {
@@ -557,12 +566,18 @@ class Linetype
             $wheres[] = str_replace('{t}', 't', $clause);
         }
 
-        $this->_find_r($token, 't', $selects, $joins, $summary);
+        $this->_find_r($token, 't', $selects, $joins, $wheres, $summary);
 
         if ($parentLink && $parentId) {
             $tablelink = Tablelink::load($parentLink);
             $joins[] = make_join($tablelink, 'parent', 't', 0, false);
             $wheres[] = "parent.id = '{$parentId}'";
+        }
+
+        // top-level join to logged-in user
+
+        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+            $joins[] = "join record_user u on u.user = :username";
         }
 
         $select = implode(', ', $selects);
@@ -571,15 +586,17 @@ class Linetype
         $orderby = implode(', ', $orderbys);
 
         $q = "select {$select} from `{$dbtable}` t {$join} {$where} order by {$orderby}";
-        $r = Db::succeed($q);
 
-        if (!$r) {
-            error_response(Db::error() . "\n\n$q\n\nlinetype: \"{$this->name}\"", 500);
+        $stmt = Db::prepare($q);
+        $result = $stmt->execute(['username' => $username]);
+
+        if (!$result) {
+            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}\n" . var_export($querydata, true));
         }
 
         $lines = [];
 
-        while ($row = mysqli_fetch_assoc($r)) {
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $line = (object) [];
 
             $line->type = $this->name;
@@ -596,11 +613,14 @@ class Linetype
         return $lines;
     }
 
-    private function _find_r($token, $alias, &$selects, &$joins, $summary = false)
+    private function _find_r($token, $alias, &$selects, &$joins, &$wheres, $summary = false)
     {
         if (!$summary) {
             $selects[] = "{$alias}.id {$alias}_id";
+            $selects[] = "{$alias}.user {$alias}_user";
         }
+
+        $username = Blends::token_username($token);
 
         foreach ($this->fields as $field) {
             if ($summary && !@$field->summary == 'sum') {
@@ -629,7 +649,7 @@ class Linetype
                 continue;
             }
 
-            $childlinetype->_find_r($token, $childalias, $selects, $joins, $summary);
+            $childlinetype->_find_r($token, $childalias, $selects, $joins, $wheres, $summary);
         }
 
         if (!$summary) {
@@ -644,12 +664,17 @@ class Linetype
                 $selects[] = "{$parentalias}.id {$parentalias}_id";
             }
         }
+
+        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+            $wheres[] = "{$alias}.user = u.user";
+        }
     }
 
     private function build_r($token, $alias, &$row, $line, $summary = false, $load_children = false, $load_files = false)
     {
         if (!$summary) {
             $line->id = $row["{$alias}_id"];
+            $line->user = $row["{$alias}_user"];
         }
 
         foreach ($this->fields as $field) {
@@ -833,6 +858,16 @@ class Linetype
 
     private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $level, $timestamp)
     {
+        $username = Blends::token_username($token);
+
+        if (!empty($line) && !is_object($line)) {
+            error_response('Lines must be objects');
+        }
+
+        if (!empty($oldline) && !is_object($oldline)) {
+            error_response('Old lines must be objects');
+        }
+
         foreach ($this->unfuse_fields as $field => $expression) {
             $field_full = str_replace('{t}', $alias, $field);
 
@@ -842,10 +877,42 @@ class Linetype
             }
         }
 
+        $unfuse_fields["{$alias}.user"] = ":{$alias}_user";
+
         $is = is_object($line) && !(@$line->_is === false);
         $was = is_object($oldline);
 
+        if (!$was && @$line->id) {
+            error_response("Cannot update: original line not found: {$this->name} {$line->id}");
+        }
+
+        if (@$line->id) {
+            $line->given_id = $line->id;
+        }
+
+        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+            if ($is && !$was && !@Config::get()->linetypes[$this->name]->cancreate) {
+                error_response("No create access for linetype {$this->name}");
+            }
+
+            if (!$is && $was && !@Config::get()->linetypes[$this->name]->candelete) {
+                error_response("No delete access for linetype {$this->name}");
+            }
+        }
+
         if ($is) {
+            if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {
+                if (!property_exists($line, 'user') && $was) {
+                    $line->user = $oldline->user;
+                }
+            } else {
+                $line->user = $was ? $oldline->user : $username;
+
+                if ($username != $line->user) {
+                    error_response('You do not have permission to update this ' . $this->name);
+                }
+            }
+
             $this->complete($line);
 
             foreach ($this->fields as $field) {
@@ -857,6 +924,8 @@ class Linetype
                     $data["{$alias}_{$field->name}"] = $line->{$field->name};
                 }
             }
+
+            $data["{$alias}_user"] = @$line->user;
 
             $errors = $this->validate($line);
 
@@ -1221,6 +1290,11 @@ class Linetype
     {
         unset($line->id);
         unset($line->type);
+
+        if (@$line->given_id) {
+            $line->id = $line->given_id;
+            unset($line->given_id);
+        }
 
         foreach ($this->fields as $field) {
             if (@$field->derived) {

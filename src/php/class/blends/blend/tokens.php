@@ -18,10 +18,6 @@ class tokens extends \Blend
                 'type' => 'text',
             ],
             (object) [
-                'name' => 'username',
-                'type' => 'text',
-            ],
-            (object) [
                 'name' => 'ttl',
                 'type' => 'number',
             ],

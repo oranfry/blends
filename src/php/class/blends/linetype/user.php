@@ -1,5 +1,6 @@
 <?php
 namespace blends\linetype;
+use \Blends;
 
 class user extends \Linetype
 {
@@ -19,18 +20,52 @@ class user extends \Linetype
             (object) [
                 'name' => 'username',
                 'type' => 'text',
-                'fuse' => '{t}.username',
+                'fuse' => '{t}.user',
+                'derived' => true,
             ],
             (object) [
                 'name' => 'updatepassword',
                 'type' => 'text',
                 'fuse' => "''",
             ],
+            (object) [
+                'name' => 'password',
+                'type' => 'text',
+                'fuse' => "''",
+            ],
+            (object) [
+                'name' => 'salt',
+                'type' => 'text',
+                'fuse' => "''",
+            ],
         ];
         $this->unfuse_fields = [
-            '{t}.username' => ':{t}_username',
-            '{t}.salt' => 'if (:{t}_updatepassword is null, {t}.salt, substring(md5(rand()), 1, 4))',
-            '{t}.password' => 'if (:{t}_updatepassword is null, {t}.password, sha2(concat(:{t}_updatepassword, {t}.salt), 256))',
+            '{t}.user' => ':{t}_username',
+            '{t}.salt' => 'if(:{t}_password is null, {t}.salt, :{t}_salt)',
+            '{t}.password' => 'ifnull(:{t}_password, {t}.password)',
         ];
+    }
+
+    function validate($line)
+    {
+        $errors = [];
+
+        if (@$line->updatepassword && !Blends::validate_password($line->updatepassword)) {
+            $errors[] = "Invalid password";
+        }
+
+        return $errors;
+    }
+
+    function complete($line)
+    {
+        if (@$line->updatepassword) {
+            $line->salt = substr(md5(rand()), 0, 4);
+            $line->password = hash('sha256', $line->updatepassword . $line->salt);
+            unset($line->updatepassword);
+        } else {
+            $line->salt = null;
+            $line->password = null;
+        }
     }
 }
