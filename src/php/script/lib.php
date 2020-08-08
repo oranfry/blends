@@ -153,10 +153,8 @@ function masterlog_check()
     }
 
     if ($count < 1) {
-        error_response('Master record lock not set up correctly - no row');
-    }
-
-    if ($count > 1) {
+        Db::succeed('insert into master_record_lock values (0)');
+    } elseif ($count > 1) {
         error_response('Master record lock not set up correctly - multiple rows');
     }
 

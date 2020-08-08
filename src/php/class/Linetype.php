@@ -248,14 +248,21 @@ class Linetype
 
                     if (!$result) {
                         Db::succeed('rollback');
-                        error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                        error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()));
                     }
 
                     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     if (!$row) {
-                        Db::succeed('rollback');
-                        error_response("Sequence for table {$statement_table} not initialised");
+                        $stmt = Db::prepare("insert into sequence_pointer values (:table, 1)");
+                        $result = $stmt->execute(['table' => $statement_table]);
+
+                        if (!$result) {
+                            Db::succeed('rollback');
+                            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()));
+                        }
+
+                        $row = ['pointer' => 1];
                     }
 
                     $inc = 1;
@@ -284,6 +291,7 @@ class Linetype
                         error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                     }
 
+                    // rm me
                     error_log($this->name . ':' . $id);
 
                     Db::succeed('commit');
