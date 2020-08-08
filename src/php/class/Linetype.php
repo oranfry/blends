@@ -417,16 +417,7 @@ class Linetype
 
             foreach ($lines as $i => $line) {
                 $line_clone = $this->clone_r($line);
-                /**
-                 * This strips too much
-                 * If some child lines are being updated they will turn into
-                 * creations because their IDs will be stripped here
-                 */
                 $this->strip_r($line_clone);
-
-                if (isset($oldids[$i])) {
-                    $line_clone->id = $oldids[$i];
-                }
 
                 $lines_clone[] = $line_clone;
             }
@@ -895,6 +886,10 @@ class Linetype
             error_response("Cannot update: original line not found: {$this->name} {$line->id}");
         }
 
+        if (@$line->id) {
+            $line->given_id = $line->id;
+        }
+
         if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
             if ($is && !$was && !@Config::get()->linetypes[$this->name]->cancreate) {
                 error_response("No create access for linetype {$this->name}");
@@ -1295,6 +1290,11 @@ class Linetype
     {
         unset($line->id);
         unset($line->type);
+
+        if (@$line->given_id) {
+            $line->id = $line->given_id;
+            unset($line->given_id);
+        }
 
         foreach ($this->fields as $field) {
             if (@$field->derived) {
