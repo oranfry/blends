@@ -291,9 +291,6 @@ class Linetype
                         error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                     }
 
-                    // rm me
-                    error_log($this->name . ':' . $id);
-
                     Db::succeed('commit');
                 }
 
