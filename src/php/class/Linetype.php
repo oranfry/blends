@@ -321,8 +321,6 @@ class Linetype
                     }
                 }
 
-                // $updates[] = 't.user = :t_user';
-
                 sort($needed_vars);
                 $needed_vars = array_unique($needed_vars);
 
@@ -930,7 +928,7 @@ class Linetype
                 }
             }
 
-            $data["{$alias}_user"] = @$line->user;
+            $data["{$alias}_user"] = @$line->user == ROOT_USERNAME ? null : @$line->user;
 
             $errors = $this->validate($line);
 
