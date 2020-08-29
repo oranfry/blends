@@ -532,6 +532,8 @@ class Linetype
 
             if ($filter->field == 'id') {
                 $expression = 't.id';
+            } elseif ($filter->field == 'user') {
+                $expression = 't.user';
             } else {
                 $field = @filter_objects($this->fields, 'name', 'is', $filter->field)[0];
 
@@ -1170,7 +1172,7 @@ class Linetype
                 $filter->value = $ids;
             }
 
-            if ($filter->field == 'id') {
+            if (in_array($filter->field, ['id', 'user'])) {
                 $r[] = $filter;
                 continue;
             }
