@@ -63,8 +63,9 @@ class user extends \Linetype
             $line->salt = substr(md5(rand()), 0, 4);
             $line->password = hash('sha256', $line->updatepassword . $line->salt);
             unset($line->updatepassword);
-        } else {
+        } elseif (!@$line->password) {
             $line->salt = null;
+        } elseif (!@$line->salt) {
             $line->password = null;
         }
     }
