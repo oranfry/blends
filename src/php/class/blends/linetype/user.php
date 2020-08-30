@@ -20,8 +20,7 @@ class user extends \Linetype
             (object) [
                 'name' => 'username',
                 'type' => 'text',
-                'fuse' => '{t}.user',
-                'derived' => true,
+                'fuse' => '{t}.username',
             ],
             (object) [
                 'name' => 'updatepassword',
@@ -40,7 +39,7 @@ class user extends \Linetype
             ],
         ];
         $this->unfuse_fields = [
-            '{t}.user' => ':{t}_username',
+            '{t}.username' => ':{t}_username',
             '{t}.salt' => 'if(:{t}_password is null, {t}.salt, :{t}_salt)',
             '{t}.password' => 'ifnull(:{t}_password, {t}.password)',
         ];
