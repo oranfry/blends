@@ -57,9 +57,9 @@ class Blends
                 error_response('Root password is set to an invalid value and so cannot be used to log in');
             }
 
-            $users = [['t_user' => $username]];
+            $users = [['t_user' => null, 't_username' => null]];
         } else {
-            $stmt = Db::prepare("select t.user t_user from {$dbtable} t where t.username = :username and t.password is not null and t.password = sha2(concat(:password, t.`salt`), 256)");
+            $stmt = Db::prepare("select t.user t_user, t.username t_username from {$dbtable} t where t.id = t.user and t.username = :username and t.password is not null and t.password = sha2(concat(:password, t.`salt`), 256)");
             $result = $stmt->execute([
                 'username' => $username,
                 'password' => $password,
@@ -82,7 +82,7 @@ class Blends
 
         $token = bin2hex(openssl_random_pseudo_bytes(32));
         $user = (object) reset($users);
-        $token_object = (object)['username' => $user->t_user, 'token' => $token];
+        $token_object = (object)['user' => $user->t_user, 'username' => $user->t_username, 'token' => $token];
 
         static::$verified_tokens[$token] = $token_object; // we are authorised before the token even hits the db
 
@@ -97,6 +97,15 @@ class Blends
         return $token;
     }
 
+    public static function token_user($token)
+    {
+        if (!static::verify_token($token)) {
+            return;
+        }
+
+        return static::$verified_tokens[$token]->user;
+    }
+
     public static function token_username($token)
     {
         if (!static::verify_token($token)) {
@@ -108,17 +117,23 @@ class Blends
 
     public static function verify_token($token)
     {
-        $dbtable = @Config::get()->tables['token'];
+        $dbtable_token = @Config::get()->tables['token'];
 
-        if (!$dbtable) {
-            error_response('Login Error (1)', 500);
+        if (!$dbtable_token) {
+            error_response('Login Error (1a)', 500);
+        }
+
+        $dbtable_user = @Config::get()->tables['user'];
+
+        if (!$dbtable_user) {
+            error_response('Login Error (1b)', 500);
         }
 
         if (isset(static::$verified_tokens[$token])) {
             return true;
         }
 
-        $stmt = Db::prepare("update {$dbtable} set used = current_timestamp, hits = hits + 1 where token = :token and used + interval ttl second >= current_timestamp");
+        $stmt = Db::prepare("update {$dbtable_token} set used = current_timestamp, hits = hits + 1 where token = :token and used + interval ttl second >= current_timestamp");
         $result = $stmt->execute([
             'token' => $token,
         ]);
@@ -131,7 +146,7 @@ class Blends
             return;
         }
 
-        $stmt = Db::prepare("select user from {$dbtable} where token = :token");
+        $stmt = Db::prepare("select t.user, u.username from {$dbtable_token} t left join {$dbtable_user} u on u.id = t.user where t.token = :token");
         $result = $stmt->execute([
             'token' => $token,
         ]);
@@ -152,7 +167,7 @@ class Blends
 
         $user = reset($users);
 
-        $token_object = (object)['token' => $token, 'username' => $user['user'] ?? ROOT_USERNAME];
+        $token_object = (object)['token' => $token, 'user' => $user['user'], 'username' => @$user['username'] ?? ROOT_USERNAME];
 
         static::$verified_tokens[$token] = $token_object;
 

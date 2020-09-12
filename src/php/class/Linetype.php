@@ -184,13 +184,9 @@ class Linetype
 
     private function _save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
     {
-        $username = Blends::token_username($token);
+        $user = Blends::token_user($token);
 
-        if (
-            (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME)
-            &&
-            !@Config::get()->linetypes[$this->name]->canwrite
-        ) {
+        if ($user && !@Config::get()->linetypes[$this->name]->canwrite) {
             error_response("No write access for linetype {$this->name}");
         }
 
@@ -342,8 +338,6 @@ class Linetype
                     $querydata[$nv] = $data[$nv] ?: null;
                 }
 
-                // $querydata['username'] = $line->user;
-
                 $result = $stmt->execute($querydata);
 
                 if (!$result) {
@@ -490,7 +484,7 @@ class Linetype
             return false;
         }
 
-        $username = Blends::token_username($token);
+        $user = Blends::token_user($token);
         $filters = $filters ?? [];
         $dbtable = @Config::get()->tables[$this->table];
 
@@ -581,8 +575,8 @@ class Linetype
 
         // top-level join to logged-in user
 
-        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
-            $joins[] = "join record_user u on u.user = :username";
+        if ($user) {
+            $joins[] = "join record_user u on u.user = :user";
         }
 
         $select = implode(', ', $selects);
@@ -593,7 +587,7 @@ class Linetype
         $q = "select {$select} from `{$dbtable}` t {$join} {$where} order by {$orderby}";
 
         $stmt = Db::prepare($q);
-        $result = $stmt->execute(['username' => $username]);
+        $result = $stmt->execute(['user' => $user]);
 
         if (!$result) {
             error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}\n" . var_export($querydata, true));
@@ -625,7 +619,7 @@ class Linetype
             $selects[] = "{$alias}.user {$alias}_user";
         }
 
-        $username = Blends::token_username($token);
+        $user = Blends::token_user($token);
 
         foreach ($this->fields as $field) {
             if ($summary && !@$field->summary == 'sum') {
@@ -670,7 +664,7 @@ class Linetype
             }
         }
 
-        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+        if ($user) {
             $wheres[] = "{$alias}.user = u.user";
         }
     }
@@ -863,7 +857,7 @@ class Linetype
 
     private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $level, $timestamp)
     {
-        $username = Blends::token_username($token);
+        $user = Blends::token_user($token);
 
         if (!empty($line) && !is_object($line)) {
             error_response('Lines must be objects');
@@ -895,7 +889,7 @@ class Linetype
             $line->given_id = $line->id;
         }
 
-        if (!defined('ROOT_USERNAME') || $username != ROOT_USERNAME) {
+        if ($user) {
             if ($is && !$was && !@Config::get()->linetypes[$this->name]->cancreate) {
                 error_response("No create access for linetype {$this->name}");
             }
@@ -906,16 +900,14 @@ class Linetype
         }
 
         if ($is) {
-            if (defined('ROOT_USERNAME') && $username == ROOT_USERNAME) {
-                if (!property_exists($line, 'user') && $was) {
-                    $line->user = $oldline->user;
-                }
-            } else {
-                $line->user = $was ? $oldline->user : $username;
+            if ($user) {
+                $line->user = $was ? $oldline->user : $user;
 
-                if ($username != $line->user) {
+                if ($user != $line->user) {
                     error_response('You do not have permission to update this ' . $this->name);
                 }
+            } elseif (!property_exists($line, 'user') && $was) {
+                $line->user = $oldline->user;
             }
 
             $this->complete($line);
@@ -930,7 +922,7 @@ class Linetype
                 }
             }
 
-            $data["{$alias}_user"] = @$line->user == ROOT_USERNAME ? null : @$line->user;
+            $data["{$alias}_user"] = @$line->user;
 
             $errors = $this->validate($line);
 
