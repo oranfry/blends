@@ -165,7 +165,7 @@ class Blend
                 $linetype_field = @filter_objects($linetype->fields, 'name', 'is', $filter->field)[0];
                 $field = @filter_objects($this->fields, 'name', 'is', $filter->field)[0];
 
-                if ($linetype_field) {
+                if ($filter->field == 'user' || $linetype_field) {
                     $linetype_filters[] = $filter;
                 } elseif (
                     $filter->cmp == '=' && $filter->value != @$field->default
