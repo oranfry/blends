@@ -590,7 +590,7 @@ class Linetype
         $result = $stmt->execute(['user' => $user]);
 
         if (!$result) {
-            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}\n" . var_export($querydata, true));
+            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}");
         }
 
         $lines = [];
