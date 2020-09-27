@@ -173,16 +173,16 @@ class Linetype
         return ['messages' => ['Printed Happily']];
     }
 
-    public function save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
+    public function save($token, $lines, $timestamp = null, $keep_filedata = false)
     {
         if (!Blends::verify_token($token)) {
             return false;
         }
 
-        return $this->_save($token, $lines, $level, $timestamp, $keep_filedata);
+        return $this->_save($token, $lines, $timestamp, $keep_filedata);
     }
 
-    private function _save($token, $lines, $level = 0, $timestamp = null, $keep_filedata = false)
+    private function _save($token, $lines, $timestamp = null, $keep_filedata = false)
     {
         $user = Blends::token_user($token);
 
@@ -230,7 +230,7 @@ class Linetype
             $ids = [];
             $oldline = @$line->id ? @$oldlines[$line->id] : null;
 
-            $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $level, $timestamp);
+            $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $timestamp);
 
             masterlog_check();
 
@@ -389,7 +389,23 @@ class Linetype
                         }
                     }
                 }
+            }
+        }
 
+        $lines_clone = [];
+
+        foreach ($lines as $i => $line) {
+            $line_clone = $this->clone_r($line);
+            $this->strip_children($line_clone);
+            $this->strip_r($line_clone);
+
+            $lines_clone[] = $line_clone;
+        }
+
+        commit($timestamp, $this->name, $lines_clone);
+
+        foreach ($lines as $line) {
+            if (@$line) {
                 foreach ($this->children as $child) {
                     if (property_exists($line, $child->label)) {
                         foreach ($line->{$child->label} as $childline) {
@@ -397,7 +413,7 @@ class Linetype
                             $childline->{$parentaliasshort} = $line->id;
                         }
 
-                        Linetype::load($child->linetype)->save($token, $line->{$child->label}, $level + 1, $timestamp);
+                        Linetype::load($child->linetype)->save($token, $line->{$child->label}, $timestamp);
                     }
                 }
 
@@ -407,19 +423,6 @@ class Linetype
                     $this->print($token, ['field' => 'id', 'cmp' => '=', 'value' => $line->id]); // not implemented
                 }
             }
-        }
-
-        if ($level == 0) {
-            $lines_clone = [];
-
-            foreach ($lines as $i => $line) {
-                $line_clone = $this->clone_r($line);
-                $this->strip_r($line_clone);
-
-                $lines_clone[] = $line_clone;
-            }
-
-            commit($timestamp, $this->name, $lines_clone);
         }
 
         if (!$keep_filedata) {
@@ -855,7 +858,7 @@ class Linetype
         unset($line->{"{$field->name}_delete"});
     }
 
-    private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $level, $timestamp)
+    private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $timestamp)
     {
         $user = Blends::token_user($token);
 
@@ -1025,7 +1028,6 @@ class Linetype
                 $data,
                 $statements,
                 $ids,
-                $level,
                 $timestamp
             );
         }
@@ -1049,7 +1051,7 @@ class Linetype
                     $childline->_is = false;
                 }
 
-                $childlinetype->save($token, $childlines, $level + 1, $timestamp);
+                $childlinetype->save($token, $childlines, $timestamp);
             }
 
             if ($tablelink) {
@@ -1283,7 +1285,14 @@ class Linetype
         $line->{$field->name} = base64_encode($filedata);
     }
 
-    public function strip_r($line, $level = 0)
+    public function strip_children($line)
+    {
+        foreach ($this->children as $child) {
+            unset($line->{$child->label});
+        }
+    }
+
+    public function strip_r($line)
     {
         unset($line->id);
         unset($line->type);
@@ -1300,23 +1309,6 @@ class Linetype
 
             if (!@$line->{$field->name}) {
                 unset($line->{$field->name});
-            }
-        }
-
-        foreach ($this->children as $child) {
-            if (!property_exists($line, $child->label) || !is_array($line->{$child->label})) {
-                continue;
-            }
-
-            if (count($line->{$child->label})) {
-                $parentaliasshort = $child->parent_link . '_' . $this->name;
-
-                foreach ($line->{$child->label} as $childline) {
-                    unset($childline->{$parentaliasshort});
-                    Linetype::load($child->linetype)->strip_r($childline, $level + 1);
-                }
-            } else {
-                unset($line->{$child->label});
             }
         }
     }
@@ -1359,7 +1351,7 @@ class Linetype
         }
     }
 
-    public function clone_r($line, $level = 0)
+    public function clone_r($line)
     {
         $clone = clone $line;
 

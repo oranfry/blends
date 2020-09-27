@@ -171,6 +171,10 @@ function masterlog_check()
 
 function commit($timestamp, $linetype, $data)
 {
+    if (!count($data)) {
+        return;
+    }
+
     Db::succeed('start transaction');
     Db::succeed('select counter from master_record_lock for update');
 
