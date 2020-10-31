@@ -60,7 +60,7 @@ function get_sku_meta()
     $r = Db::succeed("select * from record_skumeta order by sku");
     $metas = [];
 
-    while ($meta = mysqli_fetch_assoc($r)) {
+    while ($meta = $r->fetch(PDO::FETCH_ASSOC)) {
         $metas[$meta['sku']] = (object) $meta;
     }
 
@@ -84,7 +84,7 @@ function get_values($table, $field, $clause = null, $label = null)
 
     $r = Db::succeed("select `{$field}` {$labelselector} from `{$db_table}` t where `{$field}` is not null and `{$field}` != '' {$and} group by `{$field}` {$labelselector} order by `{$field}`");
 
-    while ($value = mysqli_fetch_row($r)) {
+    while ($value = $r->fetch(PDO::FETCH_NUM)) {
         if ($label) {
             $values[$value[1]] = $value[0];
         } else {
@@ -140,15 +140,10 @@ function dir_is_empty($dir)
 
 function masterlog_check()
 {
-    $result = Db::succeed('select counter from master_record_lock');
-
-    if (!$result) {
-        error_response('Master record lock not set up correctly - table error');
-    }
-
+    $result = Db::succeed('select counter from master_record_lock', [], 'Master record lock not set up correctly - table error');
     $count = 0;
 
-    while ($row = mysqli_fetch_assoc($result)) {
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
         $count++;
     }
 
@@ -175,7 +170,6 @@ function commit($timestamp, $linetype, $data)
         return;
     }
 
-    Db::succeed('start transaction');
     Db::succeed('select counter from master_record_lock for update');
 
     $master_record_file = @Config::get()->master_record_file;
@@ -184,7 +178,6 @@ function commit($timestamp, $linetype, $data)
     file_put_contents($master_record_file, $export . "\n", FILE_APPEND);
 
     Db::succeed('update master_record_lock set counter = counter + 1');
-    Db::succeed('commit');
 }
 
 function n2h($table, $n)

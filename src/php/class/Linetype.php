@@ -179,10 +179,22 @@ class Linetype
             return false;
         }
 
-        return $this->_save($token, $lines, $timestamp, $keep_filedata);
+        $commits = [];
+
+        Db::startTransaction();
+
+        $data = $this->_save($token, $lines, $timestamp, $keep_filedata, $commits);
+
+        foreach ($commits as $commit) {
+            commit($commit->timestamp, $commit->linetype, $commit->data);
+        }
+
+        Db::commit();
+
+        return $data;
     }
 
-    private function _save($token, $lines, $timestamp = null, $keep_filedata = false)
+    private function _save($token, $lines, $timestamp = null, $keep_filedata = false, &$commits = null)
     {
         $user = Blends::token_user($token);
 
@@ -223,6 +235,8 @@ class Linetype
             }
         }
 
+        masterlog_check();
+
         foreach ($lines as $line) {
             $unfuse_fields = [];
             $data = [];
@@ -230,20 +244,17 @@ class Linetype
             $ids = [];
             $oldline = @$line->id ? @$oldlines[$line->id] : null;
 
-            $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $timestamp);
-
-            masterlog_check();
+            $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $timestamp, $keep_filedata);
 
             foreach ($statements as $statement) {
                 @list($query, $querydata, $statement_table, $saveto) = $statement;
 
                 if ($saveto) {
-                    Db::succeed('start transaction');
                     $stmt = Db::prepare("select pointer from sequence_pointer where `table` = :table for update");
                     $result = $stmt->execute(['table' => $statement_table]);
 
                     if (!$result) {
-                        Db::succeed('rollback');
+                        Db::rollback();
                         error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()));
                     }
 
@@ -254,7 +265,7 @@ class Linetype
                         $result = $stmt->execute(['table' => $statement_table]);
 
                         if (!$result) {
-                            Db::succeed('rollback');
+                            Db::rollback();
                             error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()));
                         }
 
@@ -271,7 +282,7 @@ class Linetype
                     }
 
                     if ($pointer > @$sequence->max ?? 1) {
-                        Db::succeed('rollback');
+                        Db::rollback();
                         error_response("Sequence for table {$statement_table} exhausted");
                     }
 
@@ -283,11 +294,9 @@ class Linetype
                     $result = $stmt->execute(['table' => $statement_table, 'inc' => $inc]);
 
                     if (!$result) {
-                        Db::succeed('rollback');
+                        Db::rollback();
                         error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                     }
-
-                    Db::succeed('commit');
                 }
 
                 preg_match_all('/:([a-z_]+_id)/', $query, $matches);
@@ -300,6 +309,7 @@ class Linetype
                 $result = $stmt->execute($querydata);
 
                 if (!$result) {
+                    Db::rollback();
                     error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                 }
             }
@@ -341,6 +351,7 @@ class Linetype
                 $result = $stmt->execute($querydata);
 
                 if (!$result) {
+                    Db::rollback();
                     error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
                 }
             }
@@ -402,7 +413,11 @@ class Linetype
             $lines_clone[] = $line_clone;
         }
 
-        commit($timestamp, $this->name, $lines_clone);
+        $commits[] = (object) [
+            'timestamp' => $timestamp,
+            'linetype' => $this->name,
+            'data' => $lines_clone,
+        ];
 
         foreach ($lines as $line) {
             if (@$line) {
@@ -413,7 +428,7 @@ class Linetype
                             $childline->{$parentaliasshort} = $line->id;
                         }
 
-                        Linetype::load($child->linetype)->save($token, $line->{$child->label}, $timestamp);
+                        Linetype::load($child->linetype)->_save($token, $line->{$child->label}, $timestamp, $keep_filedata, $commits);
                     }
                 }
 
@@ -858,7 +873,7 @@ class Linetype
         unset($line->{"{$field->name}_delete"});
     }
 
-    private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $timestamp)
+    private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $timestamp, $keep_filedata)
     {
         $user = Blends::token_user($token);
 
@@ -1028,7 +1043,8 @@ class Linetype
                 $data,
                 $statements,
                 $ids,
-                $timestamp
+                $timestamp,
+                $keep_filedata
             );
         }
 
@@ -1051,7 +1067,7 @@ class Linetype
                     $childline->_is = false;
                 }
 
-                $childlinetype->save($token, $childlines, $timestamp);
+                $childlinetype->_save($token, $childlines, $timestamp, $keep_filedata, $commits);
             }
 
             if ($tablelink) {
