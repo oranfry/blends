@@ -24,7 +24,7 @@ class Blend
 
     public function delete($token, $filters)
     {
-        $linetypes = array_map(function ($linetype_name) {
+        $linetypes = array_map(function ($linetype_name) use ($token) {
             return Linetype::load($token, $linetype_name);
         }, $this->linetypes);
 
