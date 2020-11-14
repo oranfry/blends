@@ -1,32 +1,4 @@
 <?php
-$config = Config::get();
-
-foreach (['linetypes', 'blends', 'tables'] as $listname) {
-    if (!property_exists($config, $listname)) {
-        $config->{$listname} = [];
-    }
-}
-
-if (!in_array('user', array_keys($config->tables))) {
-    error_response('User table not defined');
-}
-
-if (!in_array('user', array_keys($config->linetypes))) {
-    $config->linetypes['user'] = (object) ['canwrite' => true, 'class' => 'blends\\linetype\\user'];
-}
-
-if (!in_array('token', array_keys($config->linetypes))) {
-    $config->linetypes['token'] = (object) ['cancreate' => true, 'canwrite' => true, 'candelete' => true, 'class' => 'blends\\linetype\\token'];
-}
-
-if (!in_array('users', array_keys($config->blends))) {
-    $config->blends['users'] = 'blends\\blend\\users';
-}
-
-if (!in_array('tokens', array_keys($config->blends))) {
-    $config->blends['tokens'] = 'blends\\blend\\tokens';
-}
-
 Db::connect();
 
 const ESC = "\x1b";
@@ -42,11 +14,11 @@ function ff($date, $day = 'Mon')
     return $date;
 }
 
-function make_join($tablelink, $alias, $base_alias, $otherside = 1, $left = true)
+function make_join($token, $tablelink, $alias, $base_alias, $otherside = 1, $left = true)
 {
     $myside = ($otherside + 1) % 2;
     $join = $left ? 'left join' : 'join';
-    $dbtable = Config::get()->tables[$tablelink->tables[$otherside]];
+    $dbtable = BlendsConfig::get($token)->tables[$tablelink->tables[$otherside]];
 
     $my_id = ($tablelink->ids[$myside] ? $tablelink->ids[$myside] . '_' : '') . 'id';
     $other_id = ($tablelink->ids[$otherside] ? $tablelink->ids[$otherside] . '_' : '') . 'id';
@@ -68,11 +40,15 @@ function get_sku_meta()
 }
 
 
-function get_values($table, $field, $clause = null, $label = null)
+function get_values($token, $table, $field, $clause = null, $label = null)
 {
+    if (strlen($token) != 64) {
+        error_response('get_values first param is token not something like: ' . $token);
+    }
+
     $values = [];
 
-    $db_table = @Config::get()->tables[$table];
+    $db_table = @BlendsConfig::get($token)->tables[$table];
 
     if (!$db_table) {
         error_response("Could not resolve {$table} to a database table name");
@@ -183,11 +159,12 @@ function commit($timestamp, $linetype, $data)
 function n2h($table, $n)
 {
     // Generate a sequence secret: php -r 'echo base64_encode(random_bytes(32)) . "\n";'
+    $sequence = BlendsConfig::get()->sequence;
 
-    $banned = @Config::get()->sequence->banned_chars ?? [];
+    $banned = @$sequence->banned_chars ?? [];
     $replace = array_fill(0, count($banned), '');
-    $sequence_secret = @Config::get()->sequence->secret;
-    $table_subs = @Config::get()->sequence->subs[$table] ?? [];
+    $sequence_secret = @$sequence->secret;
+    $table_subs = @$sequence->subs[$table] ?? [];
 
     if (!$sequence_secret) {
         error_response('Sequence Secret not defined');

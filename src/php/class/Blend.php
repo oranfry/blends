@@ -8,9 +8,9 @@ class Blend
     public $linetypes = [];
     public $fields = [];
 
-    public static function load($name)
+    public static function load($token, $name)
     {
-        $blendclass = @Config::get()->blends[$name];
+        $blendclass = @BlendsConfig::get($token)->blends[$name];
 
         if (!$blendclass) {
             error_response("No such blend '{$name}'");
@@ -25,7 +25,7 @@ class Blend
     public function delete($token, $filters)
     {
         $linetypes = array_map(function ($linetype_name) {
-            return Linetype::load($linetype_name);
+            return Linetype::load($token, $linetype_name);
         }, $this->linetypes);
 
         $numQueries = 0;
@@ -34,7 +34,7 @@ class Blend
         $linkDeletes = [];
 
         foreach ($linetypes as $linetype) {
-            $_filters = $linetype->filter_filters($filters, $this->fields);
+            $_filters = $linetype->filter_filters($token, $filters, $this->fields);
 
             if ($_filters === false) {
                 continue;
@@ -50,8 +50,8 @@ class Blend
             return false;
         }
 
-        $linetypes = array_map(function ($linetype_name) {
-            return Linetype::load($linetype_name);
+        $linetypes = array_map(function ($linetype_name) use ($token) {
+            return Linetype::load($token, $linetype_name);
         }, $this->linetypes);
 
         if (@$this->groupby) {
@@ -61,7 +61,7 @@ class Blend
         $records = [];
 
         foreach ($linetypes as $linetype) {
-            $_filters = $linetype->filter_filters($filters, $this->fields);
+            $_filters = $linetype->filter_filters($token, $filters, $this->fields);
 
             if ($_filters === false) {
                 continue;
@@ -121,12 +121,12 @@ class Blend
             return false;
         }
 
-        $linetypes = array_map(function ($linetype_name) {
-            return Linetype::load($linetype_name);
+        $linetypes = array_map(function ($linetype_name) use ($token) {
+            return Linetype::load($token, $linetype_name);
         }, $this->linetypes);
 
         foreach ($linetypes as $linetype) {
-            $_filters = $linetype->filter_filters($filters, $this->fields);
+            $_filters = $linetype->filter_filters($token, $filters, $this->fields);
 
             if ($_filters === false) {
                 continue;
@@ -148,8 +148,8 @@ class Blend
             return [];
         }
 
-        $linetypes = array_map(function ($linetype_name) {
-            return Linetype::load($linetype_name);
+        $linetypes = array_map(function ($linetype_name) use ($token) {
+            return Linetype::load($token, $linetype_name);
         }, $this->linetypes);
 
         $balances = (object) [];
@@ -192,12 +192,12 @@ class Blend
             return false;
         }
 
-        $linetypes = array_map(function ($linetype_name) {
-            return Linetype::load($linetype_name);
+        $linetypes = array_map(function ($linetype_name) use ($token) {
+            return Linetype::load($token, $linetype_name);
         }, $this->linetypes);
 
         foreach ($linetypes as $linetype) {
-            $_filters = $linetype->filter_filters($filters, $this->fields);
+            $_filters = $linetype->filter_filters($token, $filters, $this->fields);
 
             if ($_filters === false) {
                 continue;

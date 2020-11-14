@@ -29,8 +29,7 @@ class Blends
 
     public static function login($username, $password, $one_time = false)
     {
-        $dbtable = @Config::get()->tables['user'];
-        $allowed_users = @Config::get()->allowed_users;
+        $dbtable = @BlendsConfig::get()->tables['user'];
 
         if (!$dbtable) {
             error_response('User table not set up', 500);
@@ -57,7 +56,7 @@ class Blends
                 error_response('Root password is set to an invalid value and so cannot be used to log in');
             }
 
-            $users = [['t_user' => null, 't_username' => null]];
+            $users = [['t_user' => null, 't_username' => ROOT_USERNAME]];
         } else {
             $stmt = Db::prepare("select t.user t_user, t.username t_username from {$dbtable} t where t.id = t.user and t.username = :username and t.password is not null and t.password = sha2(concat(:password, t.`salt`), 256)");
             $result = $stmt->execute([
@@ -76,10 +75,6 @@ class Blends
             return;
         }
 
-        if (is_array($allowed_users) && !in_array($username, $allowed_users)) {
-            return;
-        }
-
         $token = bin2hex(openssl_random_pseudo_bytes(32));
         $user = (object) reset($users);
         $token_object = (object)['user' => $user->t_user, 'username' => $user->t_username, 'token' => $token];
@@ -87,7 +82,7 @@ class Blends
         static::$verified_tokens[$token] = $token_object; // we are authorised before the token even hits the db
 
         if (!$one_time) {
-            $token_objects = Linetype::load('token')->save($token, [$token_object]);
+            $token_objects = Linetype::load(null, 'token')->save($token, [$token_object]);
 
             if (!count($token_objects)) {
                 error_response('Login Error (2)', 500);
@@ -117,13 +112,13 @@ class Blends
 
     public static function verify_token($token)
     {
-        $dbtable_token = @Config::get()->tables['token'];
+        $dbtable_token = @BlendsConfig::get()->tables['token'];
 
         if (!$dbtable_token) {
             error_response('Login Error (1a)', 500);
         }
 
-        $dbtable_user = @Config::get()->tables['user'];
+        $dbtable_user = @BlendsConfig::get()->tables['user'];
 
         if (!$dbtable_user) {
             error_response('Login Error (1b)', 500);
@@ -176,7 +171,7 @@ class Blends
 
     public static function logout($token)
     {
-        Linetype::load('token')->delete($token, [(object)[
+        Linetype::load(null, 'token')->delete($token, [(object)[
             'field' => 'token',
             'cmp' => '=',
             'value' => $token

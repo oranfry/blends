@@ -18,25 +18,29 @@ class BlendHelper
 
     public static function add_tag_field($blend, $fieldname, $place = null, $after_field = null)
     {
-        $tagvalues = [];
-
-        if ($place) {
-            foreach (is_array($place) ? $place : [$place] as $pl) {
-                list($table, $field) = explode('.', $pl);
-                $tagvalues = array_merge($tagvalues, get_values($table, $field));
-            }
-
-            $tagvalues = array_values(array_unique($tagvalues));
-
-            sort($tagvalues);
-        }
-
-        static::add_field($blend, (object) [
+        $field_object = (object) [
            'name' => $fieldname,
            'type' => 'text',
-           'filteroptions' => $tagvalues,
            'groupable' => true,
            'main' => true,
-        ], $after_field);
+        ];
+
+        if ($place) {
+            $field_object->filteroptions = function ($token) use ($place) {
+                $tagvalues = [];
+
+                foreach (is_array($place) ? $place : [$place] as $pl) {
+                    list($table, $field) = explode('.', $pl);
+                    $tagvalues = array_merge($tagvalues, get_values($token, $table, $field));
+                }
+
+                $tagvalues = array_values(array_unique($tagvalues));
+                sort($tagvalues);
+
+                return $tagvalues;
+             };
+        }
+
+        static::add_field($blend, $field_object, $after_field);
     }
 }

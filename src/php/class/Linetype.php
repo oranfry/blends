@@ -15,9 +15,9 @@ class Linetype
 
     private static $incoming_links = null;
 
-    public static function load($name)
+    public static function load($token, $name)
     {
-        $linetypeclass = @Config::get()->linetypes[$name]->class;
+        $linetypeclass = @BlendsConfig::get($token)->linetypes[$name]->class;
 
         if (!$linetypeclass) {
             error_response("No such linetype '{$name}'");
@@ -29,13 +29,13 @@ class Linetype
         return $linetype;
     }
 
-    public final function find_incoming_links()
+    public final function find_incoming_links($token)
     {
         if (self::$incoming_links == null) {
             self::$incoming_links = [];
 
-            foreach (Config::get()->linetypes as $name => $class) {
-                $linetype = Linetype::load($name);
+            foreach (BlendsConfig::get($token)->linetypes as $name => $class) {
+                $linetype = Linetype::load($token, $name);
 
                 foreach ($linetype->children as $child) {
                     $link = clone $child;
@@ -61,7 +61,7 @@ class Linetype
     {
     }
 
-    public function get_suggested_values()
+    public function get_suggested_values($token)
     {
         return [];
     }
@@ -153,7 +153,7 @@ class Linetype
                 continue; // lets not and say we did - for testing!
             }
 
-            $logofile = @Config::get()->logofile;
+            $logofile = @BlendsConfig::get($token)->logofile;
 
             $printout = '';
             $printout .= ESC."@"; // Reset to defaults
@@ -198,11 +198,11 @@ class Linetype
     {
         $user = Blends::token_user($token);
 
-        if ($user && !@Config::get()->linetypes[$this->name]->canwrite) {
+        if ($user && !@BlendsConfig::get($token)->linetypes[$this->name]->canwrite) {
             error_response("No write access for linetype {$this->name}");
         }
 
-        $sequence = @Config::get()->sequence;
+        $sequence = @BlendsConfig::get()->sequence;
 
         if (!$sequence) {
             error_response("Sequences not set up");
@@ -216,7 +216,7 @@ class Linetype
             error_response("Linetype::save - please pass in an array of lines");
         }
 
-        $dbtable = @Config::get()->tables[$this->table];
+        $dbtable = @BlendsConfig::get($token)->tables[$this->table];
 
         if (!$dbtable) {
             error_response("Could not resolve table {$this->table} to a database table");
@@ -359,7 +359,7 @@ class Linetype
             if (@$line) {
                 $line->id = $ids['t_id'];
 
-                foreach ($this->find_incoming_links() as $incoming) {
+                foreach ($this->find_incoming_links($token) as $incoming) {
                     $tablelink = Tablelink::load($incoming->parent_link);
                     $parentside = @$incoming->reverse ? 1 : 0;
                     $childside = ($parentside + 1) % 2;
@@ -406,7 +406,7 @@ class Linetype
         $lines_clone = [];
 
         foreach ($lines as $i => $line) {
-            $line_clone = $this->clone_r($line);
+            $line_clone = $this->clone_r($token, $line);
             $this->strip_children($line_clone);
             $this->strip_r($line_clone);
 
@@ -428,7 +428,7 @@ class Linetype
                             $childline->{$parentaliasshort} = $line->id;
                         }
 
-                        Linetype::load($child->linetype)->_save($token, $line->{$child->label}, $timestamp, $keep_filedata, $commits);
+                        Linetype::load($token, $child->linetype)->_save($token, $line->{$child->label}, $timestamp, $keep_filedata, $commits);
                     }
                 }
 
@@ -442,7 +442,7 @@ class Linetype
 
         if (!$keep_filedata) {
             foreach ($lines as $line) {
-                $this->stripfiledata_r($line);
+                $this->stripfiledata_r($token, $line);
             }
         }
 
@@ -462,7 +462,7 @@ class Linetype
     {
         $parentaliasshort = null;
 
-        foreach ($this->find_incoming_links() as $incoming) {
+        foreach ($this->find_incoming_links($token) as $incoming) {
             $_parentaliasshort = $incoming->parent_link . '_' . $incoming->parent_linetype;
 
             if ($from == $_parentaliasshort) {
@@ -504,7 +504,7 @@ class Linetype
 
         $user = Blends::token_user($token);
         $filters = $filters ?? [];
-        $dbtable = @Config::get()->tables[$this->table];
+        $dbtable = @BlendsConfig::get($token)->tables[$this->table];
 
         if (!$dbtable) {
             error_response("Could not resolve table {$this->table} to a database table");
@@ -519,8 +519,8 @@ class Linetype
         foreach ($filters as $filter) {
             $cmp = @$filter->cmp ?: '=';
 
-            $is_parentage_filter = (function($linetype, $filter) {
-                foreach ($linetype->find_incoming_links() as $parent) {
+            $is_parentage_filter = (function($linetype, $filter) use ($token) {
+                foreach ($linetype->find_incoming_links($token) as $parent) {
                     $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
 
                     if ($filter->field == $parentaliasshort) {
@@ -553,7 +553,7 @@ class Linetype
                     error_response("Cant find fuse expression for filter field {$this->name} {$filter->field} (1)\n\n" . var_export($this->fields, 1));
                 }
 
-                $expression = $this->render_fuse_expression($field->name, 't');
+                $expression = $this->render_fuse_expression($token, $field->name, 't');
 
                 if (!$expression) {
                     error_response("Cant find fuse expression for filter field {$this->name} {$filter->field} (2)\n\n" . var_export($this->fields, 1));
@@ -587,7 +587,7 @@ class Linetype
 
         if ($parentLink && $parentId) {
             $tablelink = Tablelink::load($parentLink);
-            $joins[] = make_join($tablelink, 'parent', 't', 0, false);
+            $joins[] = make_join($token, $tablelink, 'parent', 't', 0, false);
             $wheres[] = "parent.id = '{$parentId}'";
         }
 
@@ -644,7 +644,7 @@ class Linetype
                 continue;
             }
 
-            $fuse = $this->render_fuse_expression($field->name, $alias, $summary);
+            $fuse = $this->render_fuse_expression($token, $field->name, $alias, $summary);
 
             if (!$fuse) {
                 continue;
@@ -654,13 +654,13 @@ class Linetype
         }
 
         foreach (@$this->inlinelinks ?? [] as $child) {
-            $childlinetype = Linetype::load($child->linetype);
+            $childlinetype = Linetype::load($token, $child->linetype);
             $tablelink = Tablelink::load($child->tablelink);
             $side = @$child->reverse ? 0 : 1;
             $leftJoin = @$child->required ? false : true;
             $childalias = $alias . '_'  . (@$child->alias ?? $tablelink->ids[$side]);
 
-            $joins[] = make_join($tablelink, $childalias, $alias, $side, $leftJoin);
+            $joins[] = make_join($token, $tablelink, $childalias, $alias, $side, $leftJoin);
 
             if (@$child->norecurse) {
                 continue;
@@ -670,14 +670,14 @@ class Linetype
         }
 
         if (!$summary) {
-            foreach ($this->find_incoming_links() as $incoming) {
+            foreach ($this->find_incoming_links($token) as $incoming) {
                 $tablelink = Tablelink::load($incoming->parent_link);
                 $side = @$incoming->reverse ? 1 : 0;
                 $leftJoin = @$child->required ? false : true;
                 $parentaliasshort = $incoming->parent_link . '_' . $incoming->parent_linetype;
                 $parentalias = $alias . '_'  . $parentaliasshort;
 
-                $joins[] = make_join($tablelink, $parentalias, $alias, $side, $leftJoin);
+                $joins[] = make_join($token, $tablelink, $parentalias, $alias, $side, $leftJoin);
                 $selects[] = "{$parentalias}.id {$parentalias}_id";
             }
         }
@@ -712,7 +712,7 @@ class Linetype
                 }
             }
 
-            $fuse = $this->render_fuse_expression($field->name, $alias, $summary);
+            $fuse = $this->render_fuse_expression($token, $field->name, $alias, $summary);
 
             if (!$fuse) {
                 continue;
@@ -739,7 +739,7 @@ class Linetype
                 continue;
             }
 
-            $childlinetype = Linetype::load($child->linetype);
+            $childlinetype = Linetype::load($token, $child->linetype);
             $childline = (object) [];
 
             $childlinetype->build_r($token, $childalias, $row, $childline, $summary, $load_children, $load_files);
@@ -748,7 +748,7 @@ class Linetype
         }
 
         if (!$summary) {
-            foreach ($this->find_incoming_links() as $incoming) {
+            foreach ($this->find_incoming_links($token) as $incoming) {
                 $tablelink = Tablelink::load($incoming->parent_link);
                 $side = @$incoming->reverse ? 1 : 0;
                 $leftJoin = @$child->required ? false : true;
@@ -770,7 +770,7 @@ class Linetype
         }
     }
 
-    private function render_fuse_expression($fieldname, $alias, $summary = false)
+    private function render_fuse_expression($token, $fieldname, $alias, $summary = false)
     {
         $raw = null;
 
@@ -788,7 +788,7 @@ class Linetype
             $raw = $field->fuse;
         } elseif (@$field->borrow) {
             $raw = $field->borrow;
-            $this->borrow_r($alias, 't', $raw);
+            $this->borrow_r($token, $alias, 't', $raw);
         }
 
         if (!$raw) {
@@ -804,7 +804,7 @@ class Linetype
         return $fuse;
     }
 
-    private function borrow_r($root, $alias, &$expression)
+    private function borrow_r($token, $root, $alias, &$expression)
     {
         foreach (@$this->inlinelinks ?: [] as $child) {
             if (@$child->norecurse) {
@@ -812,11 +812,11 @@ class Linetype
             }
 
             $childaliasshort = @$child->alias ?? Tablelink::load($child->tablelink)->ids[@$child->reverse ? 0 : 1];
-            $childlinetype = Linetype::load($child->linetype);
+            $childlinetype = Linetype::load($token, $child->linetype);
             $childalias = "{$alias}_{$childaliasshort}";
 
             foreach ($childlinetype->fields ?: [] as $field) {
-                $fuse = $childlinetype->render_fuse_expression($field->name, "{$root}_{$childaliasshort}");
+                $fuse = $childlinetype->render_fuse_expression($token, $field->name, "{$root}_{$childaliasshort}");
 
                 if ($fuse) {
                     $expression = str_replace('{' . "{$childalias}_{$field->name}" . '}', $fuse, $expression);
@@ -824,6 +824,7 @@ class Linetype
             }
 
             $childlinetype->borrow_r(
+                $token,
                 "{$root}_{$childaliasshort}",
                 "{$alias}_{$childaliasshort}",
                 $expression
@@ -908,11 +909,11 @@ class Linetype
         }
 
         if ($user) {
-            if ($is && !$was && !@Config::get()->linetypes[$this->name]->cancreate) {
+            if ($is && !$was && !@BlendsConfig::get($token)->linetypes[$this->name]->cancreate) {
                 error_response("No create access for linetype {$this->name}");
             }
 
-            if (!$is && $was && !@Config::get()->linetypes[$this->name]->candelete) {
+            if (!$is && $was && !@BlendsConfig::get($token)->linetypes[$this->name]->candelete) {
                 error_response("No delete access for linetype {$this->name}");
             }
         }
@@ -951,7 +952,7 @@ class Linetype
             $this->unpack($line);
         }
 
-        $dbtable = @Config::get()->tables[$this->table];
+        $dbtable = @BlendsConfig::get($token)->tables[$this->table];
 
         if ($was) {
             $ids["{$alias}_id"] = $oldline->id;
@@ -1027,7 +1028,7 @@ class Linetype
                 $childtablelink = $childtablelink->reverse();
             }
 
-            $childlinetype = Linetype::load($child->linetype);
+            $childlinetype = Linetype::load($token, $child->linetype);
             $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
             $childline = $is && $this->has($line, $childaliasshort) ? (@$line->{$childaliasshort} ?? (object) []) : null;
             $childoldline = @$oldline->{$childaliasshort};
@@ -1060,7 +1061,7 @@ class Linetype
                     continue;
                 }
 
-                $childlinetype = Linetype::load($child->linetype);
+                $childlinetype = Linetype::load($token, $child->linetype);
                 $childlines = $childlinetype->_find_lines($token, null, $line->id, $child->parent_link);
 
                 foreach ($childlines as $childline) {
@@ -1101,7 +1102,7 @@ class Linetype
                 $childtablelink = $childtablelink->reverse();
             }
 
-            $childlinetype = Linetype::load($child->linetype);
+            $childlinetype = Linetype::load($token, $child->linetype);
             $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
             $childline = @$line->{$childaliasshort};
 
@@ -1142,7 +1143,7 @@ class Linetype
 
     private function _load_childset($token, $line, $descriptor)
     {
-        $child_linetype = Linetype::load(@$descriptor->linetype);
+        $child_linetype = Linetype::load($token, @$descriptor->linetype);
         $fields = $child_linetype->fields;
 
         $line->{$descriptor->label} = $child_linetype->find_lines($token, null, $line->id, $descriptor->parent_link);
@@ -1154,7 +1155,7 @@ class Linetype
         return $line->{$descriptor->label};
     }
 
-    public function filter_filters($filters, $fields)
+    public function filter_filters($token, $filters, $fields)
     {
         $r = [];
 
@@ -1200,7 +1201,7 @@ class Linetype
 
             // try a reference field
 
-            foreach ($this->find_incoming_links() as $parent) {
+            foreach ($this->find_incoming_links($token) as $parent) {
                 $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
 
                 if ($filter->field == $parentaliasshort) {
@@ -1329,7 +1330,7 @@ class Linetype
         }
     }
 
-    public function stripfiledata_r($line)
+    public function stripfiledata_r($token, $line)
     {
         foreach ($this->fields as $field) {
             if ($field->type == 'file') {
@@ -1343,7 +1344,7 @@ class Linetype
             }
 
             foreach ($line->{$child->label} as $childline) {
-                Linetype::load($child->linetype)->stripfiledata_r($childline);
+                Linetype::load($token, $child->linetype)->stripfiledata_r($token, $childline);
             }
         }
 
@@ -1362,12 +1363,12 @@ class Linetype
             $childline = @$line->{$childaliasshort};
 
             if ($childline) {
-                Linetype::load($child->linetype)->stripfiledata_r($childline);
+                Linetype::load($token, $child->linetype)->stripfiledata_r($token, $childline);
             }
         }
     }
 
-    public function clone_r($line)
+    public function clone_r($token, $line)
     {
         $clone = clone $line;
 
@@ -1377,7 +1378,7 @@ class Linetype
             }
 
             foreach ($line->{$child->label} as $i => $childline) {
-                $line->{$child->label}[$i] = Linetype::load($child->linetype)->clone_r($childline);
+                $line->{$child->label}[$i] = Linetype::load($token, $child->linetype)->clone_r($token, $childline);
             }
         }
 
@@ -1396,7 +1397,7 @@ class Linetype
             $childline = @$line->{$childaliasshort};
 
             if ($childline) {
-                $line->{$childaliasshort} = Linetype::load($child->linetype)->clone_r($childline);
+                $line->{$childaliasshort} = Linetype::load($token, $child->linetype)->clone_r($token, $childline);
             }
         }
 

@@ -79,13 +79,13 @@ class LinetypeHelper
         }
     }
 
-    public static function add_tag_suggestions(&$suggested_values, $fieldname, $place)
+    public static function add_tag_suggestions($token, &$suggested_values, $fieldname, $place)
     {
         $tagvalues = [];
 
         foreach (is_array($place) ? $place : [$place] as $pl) {
             list($table, $field) = explode('.', $pl);
-            $tagvalues = array_merge($tagvalues, get_values($table, $field));
+            $tagvalues = array_merge($tagvalues, get_values($token, $table, $field));
         }
 
         $tagvalues = array_values(array_unique($tagvalues));
