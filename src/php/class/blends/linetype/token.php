@@ -26,6 +26,16 @@ class token extends \Linetype
                 'type' => 'number',
                 'fuse' => "{t}.ttl",
             ],
+            (object) [
+                'name' => 'used',
+                'type' => 'text',
+                'fuse' => "{t}.used",
+            ],
+            (object) [
+                'name' => 'expired',
+                'type' => 'text',
+                'fuse' => "if ({t}.used + interval {t}.ttl second < current_timestamp, 'yes', 'no')",
+            ],
         ];
         $this->unfuse_fields = [
             '{t}.token' => ':{t}_token',

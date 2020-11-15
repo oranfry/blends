@@ -21,6 +21,14 @@ class tokens extends \Blend
                 'name' => 'ttl',
                 'type' => 'number',
             ],
+            (object) [
+                'name' => 'used',
+                'type' => 'text',
+            ],
+            (object) [
+                'name' => 'expired',
+                'type' => 'text',
+            ],
         ];
         $this->showass = ['list'];
     }
