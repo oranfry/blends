@@ -9,7 +9,7 @@ class BlendsConfig
             return static::$lookup[$token];
         }
 
-        if (!$token) {
+        if (!$token || !Blends::verify_token($token)) {
             $entrypoint = 'base';
         } elseif (defined('ROOT_USERNAME') && Blends::token_username($token) == ROOT_USERNAME) {
             $entrypoint = 'root';

@@ -28,8 +28,13 @@ class token extends \Linetype
             ],
             (object) [
                 'name' => 'used',
-                'type' => 'text',
+                'type' => 'timestamp',
                 'fuse' => "{t}.used",
+            ],
+            (object) [
+                'name' => 'hits',
+                'type' => 'number',
+                'fuse' => "{t}.hits",
             ],
             (object) [
                 'name' => 'expired',

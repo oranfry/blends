@@ -107,7 +107,7 @@ class Blends
             return;
         }
 
-        return static::$verified_tokens[$token]->username;
+        return static::$verified_tokens[$token]->username ?? (defined('ROOT_USERNAME') ? ROOT_USERNAME : null);
     }
 
     public static function verify_token($token)
@@ -128,7 +128,7 @@ class Blends
             return true;
         }
 
-        $stmt = Db::prepare("update {$dbtable_token} set used = current_timestamp, hits = hits + 1 where token = :token and used + interval ttl second >= current_timestamp");
+        $stmt = Db::prepare("update {$dbtable_token} set used = current_timestamp, hits = ifnull(hits, 0) + 1 where token = :token and ifnull(used, current_timestamp) + interval ttl second >= current_timestamp");
         $result = $stmt->execute([
             'token' => $token,
         ]);
