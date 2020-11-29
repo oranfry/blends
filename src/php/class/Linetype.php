@@ -718,7 +718,11 @@ class Linetype
                 continue;
             }
 
-            $line->{$field->name} = $row["{$alias}_{$field->name}"];
+            if ($field->type == 'number' && $row["{$alias}_{$field->name}"] !== null) {
+                $line->{$field->name} = number_format($row["{$alias}_{$field->name}"], @$field->dp ?? 0, '.', '');
+            } else {
+                $line->{$field->name} = $row["{$alias}_{$field->name}"];
+            }
 
             if (!$summary && property_exists($field, 'calc')) {
                 $line->{$field->name} = ($field->calc)($line);
