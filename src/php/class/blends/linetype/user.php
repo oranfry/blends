@@ -14,34 +14,44 @@ class user extends \Linetype
             (object) [
                 'name' => 'icon',
                 'type' => 'icon',
-                'fuse' => "'person'",
+                'fuse' => function($record) : string {
+                    return 'person';
+                },
                 'derived' => true,
             ],
             (object) [
                 'name' => 'username',
                 'type' => 'text',
-                'fuse' => '{t}.username',
+                'fuse' => function($record) : string {
+                    return $record->username;
+                },
             ],
             (object) [
                 'name' => 'updatepassword',
                 'type' => 'text',
-                'fuse' => "''",
+                'fuse' => function($record) : string {},
             ],
             (object) [
                 'name' => 'password',
                 'type' => 'text',
-                'fuse' => "''",
+                'fuse' => function($record) : string {},
             ],
             (object) [
                 'name' => 'salt',
                 'type' => 'text',
-                'fuse' => "''",
+                'fuse' => function($record) : string {},
             ],
         ];
         $this->unfuse_fields = [
-            '{t}.username' => ':{t}_username',
-            '{t}.salt' => 'if(:{t}_password is null, {t}.salt, :{t}_salt)',
-            '{t}.password' => 'ifnull(:{t}_password, {t}.password)',
+            '{t}.username' => function($line, $oldline) : string {
+                return $line->username;
+            },
+            '{t}.password' => function($line, $oldline) : string {
+                return $line->password ?? @$oldline->password;
+            },
+            '{t}.salt' => function($line, $oldline) : string {
+                return $line->password ? $line->salt : @$oldline->salt;
+            },
         ];
     }
 

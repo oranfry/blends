@@ -247,7 +247,7 @@ class Linetype
             $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $timestamp, $keep_filedata);
 
             foreach ($statements as $statement) {
-                @list($query, $querydata, $statement_table, $saveto) = $statement;
+                @list($statement_table, $record, $saveto) = $statement;
 
                 if ($saveto) {
                     $stmt = Db::prepare("select pointer from sequence_pointer where `table` = :table for update");
@@ -288,30 +288,20 @@ class Linetype
 
                     $id = n2h($statement_table, $pointer);
                     $ids[$saveto] = $id;
-                    $querydata[$saveto] = $id;
 
                     $stmt = Db::prepare("update sequence_pointer set pointer = pointer + :inc where `table` = :table");
                     $result = $stmt->execute(['table' => $statement_table, 'inc' => $inc]);
 
                     if (!$result) {
                         Db::rollback();
-                        error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                        error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}");
                     }
                 }
 
-                preg_match_all('/:([a-z_]+_id)/', $query, $matches);
+                $id = @$record->id ?? $ids[$saveto];
 
-                for ($i = 0; $i < count($matches[1]); $i++) {
-                    $querydata[$matches[1][$i]] = $ids[$matches[1][$i]];
-                }
-
-                $stmt = Db::prepare($query);
-                $result = $stmt->execute($querydata);
-
-                if (!$result) {
-                    Db::rollback();
-                    error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
-                }
+                @mkdir("/home/oran/Desktop/{$statement_table}");
+                file_put_contents("/home/oran/Desktop/{$statement_table}/{$ids[$saveto]}.json", json_encode($record));
             }
 
             if (count($unfuse_fields)) {
@@ -644,7 +634,8 @@ class Linetype
                 continue;
             }
 
-            $fuse = $this->render_fuse_expression($token, $field->name, $alias, $summary);
+            // $fuse = $this->render_fuse_expression($token, $field->name, $alias, $summary);
+            $fuse = null;
 
             if (!$fuse) {
                 continue;
@@ -890,16 +881,17 @@ class Linetype
             error_response('Old lines must be objects');
         }
 
-        foreach ($this->unfuse_fields as $field => $expression) {
+        foreach ($this->unfuse_fields as $field => $func) {
             $field_full = str_replace('{t}', $alias, $field);
 
             if (!isset($unfuse_fields[$field_full])) {
-                $expression_full = str_replace('{t}', $alias, $expression);
-                $unfuse_fields[$field_full] = $expression_full;
+                $unfuse_fields[$field_full] = $func;
             }
         }
 
-        $unfuse_fields["{$alias}.user"] = ":{$alias}_user";
+        $unfuse_fields["{$alias}.user"] = function($line, $oldline) {
+            return $line->user;
+        };
 
         $is = is_object($line) && !(@$line->_is === false);
         $was = is_object($oldline);
@@ -965,52 +957,20 @@ class Linetype
                 $line->id = $oldline->id;
             }
         } elseif ($is) {
-            $fields = [];
-            $values = [];
-            $needed_vars = [];
+            $record = (object) [];
 
-            $fields[] = 'id';
-            $values[] = ":{$alias}_id";
-
-            foreach ($unfuse_fields as $field => $expression) {
+            foreach ($unfuse_fields as $field => $func) {
                 if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
-                    $fields[] = $groups[1];
-                    $values[] = str_replace('t.', '', $expression);
-
-                    preg_match_all('/:([a-z_]+)/', $expression, $matches);
-
-                    for ($i = 0; $i < count($matches[1]); $i++) {
-                        $needed_vars[] = $matches[1][$i];
-                    }
+                    $record->{$groups[1]} = ($func)($line, $oldline);
                 }
             }
 
-            if ($timestamp !== null) {
-                $fields[] = 'created';
-                $values[] = ":created";
-            }
+            $statements[] = [$this->table, $record, "{$alias}_id"];
 
-            $fieldsClause = implode(', ', $fields);
-            $valuesClause = implode(', ', $values);
-
-            $q = "insert into {$dbtable} ({$fieldsClause}) values ({$valuesClause})";
-
-            $querydata = [];
-
-            foreach ($needed_vars as $nv) {
-                $querydata[$nv] = $data[$nv];
-            }
-
-            if ($timestamp !== null) {
-                $querydata['created'] = $timestamp;
-            }
-
-            $statements[] = [$q, $querydata, $this->table, "{$alias}_id"];
-
-            if ($tablelink) {
-                $q = "insert into {$tablelink->middle_table} ({$tablelink->ids[0]}_id, {$tablelink->ids[1]}_id) values (:{$parentalias}_id, :{$alias}_id)";
-                $statements[] = [$q, []];
-            }
+            // if ($tablelink) {
+            //     $q = "insert into {$tablelink->middle_table} ({$tablelink->ids[0]}_id, {$tablelink->ids[1]}_id) values (:{$parentalias}_id, :{$alias}_id)";
+            //     $statements[] = [$q, []];
+            // }
         }
 
         if (!$is || !$was) {
@@ -1121,7 +1081,7 @@ class Linetype
         if (!Blends::verify_token($token)) {
             return false;
         }
-;
+
         return $this->_load_children($token, $line);
     }
 

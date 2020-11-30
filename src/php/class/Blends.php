@@ -128,41 +128,51 @@ class Blends
             return true;
         }
 
-        $stmt = Db::prepare("update {$dbtable_token} set used = current_timestamp, hits = ifnull(hits, 0) + 1 where token = :token and ifnull(used, current_timestamp) + interval ttl second >= current_timestamp");
-        $result = $stmt->execute([
-            'token' => $token,
-        ]);
+        $handle = opendir("/home/oran/Desktop/token");
+        $tokendata = null;
 
-        if (!$result) {
-            error_response('Token Verification Error (1)' . implode(' - ', $stmt->errorInfo()), 500);
+        while ($file = readdir($handle)) {
+            $fullfile = "/home/oran/Desktop/token/{$file}";
+
+            if (is_dir($fullfile)) {
+                continue;
+            }
+
+            $json = json_decode(file_get_contents($fullfile));
+
+            if (@$json->token == $token) {
+                $tokendata = $json;
+                break;
+            }
         }
 
-        if (!$stmt->rowCount()) {
+        if (!$tokendata) {
             return;
         }
 
-        $stmt = Db::prepare("select t.user, u.username from {$dbtable_token} t left join {$dbtable_user} u on u.id = t.user where t.token = :token");
-        $result = $stmt->execute([
-            'token' => $token,
-        ]);
+        // $stmt = Db::prepare("select t.user, u.username from {$dbtable_token} t left join {$dbtable_user} u on u.id = t.user where t.token = :token");
+        // $result = $stmt->execute([
+        //     'token' => $token,
+        // ]);
 
-        if (!$result) {
-            error_response('Token Verification Error (2)' . implode(' - ', $stmt->errorInfo()), 500);
-        }
+        // if (!$result) {
+        //     error_response('Token Verification Error (2)' . implode(' - ', $stmt->errorInfo()), 500);
+        // }
 
-        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        if (!count($users)) {
-            error_response('Token Verification Error (3)' . implode(' - ', $stmt->errorInfo()), 500);
-        }
+        // if (!count($users)) {
+        //     error_response('Token Verification Error (3)' . implode(' - ', $stmt->errorInfo()), 500);
+        // }
 
-        if (count($users) > 1) {
-            error_response('Token Verification Error (4)' . implode(' - ', $stmt->errorInfo()), 500);
-        }
+        // if (count($users) > 1) {
+        //     error_response('Token Verification Error (4)' . implode(' - ', $stmt->errorInfo()), 500);
+        // }
 
-        $user = reset($users);
+        // $user = reset($users);
 
-        $token_object = (object)['token' => $token, 'user' => $user['user'], 'username' => @$user['username'] ?? ROOT_USERNAME];
+        // $token_object = (object)['token' => $token, 'user' => $user['user'], 'username' => @$user['username'] ?? ROOT_USERNAME];
+        $token_object = (object)['token' => $token, 'user' => null, 'username' => ROOT_USERNAME];
 
         static::$verified_tokens[$token] = $token_object;
 
