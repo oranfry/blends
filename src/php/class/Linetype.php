@@ -890,11 +890,11 @@ class Linetype
             error_response('Old lines must be objects');
         }
 
-        foreach ($this->unfuse_fields as $field => $expression) {
+        foreach ($this->unfuse_fields as $field => $details) {
             $field_full = str_replace('{t}', $alias, $field);
 
             if (!isset($unfuse_fields[$field_full])) {
-                $expression_full = str_replace('{t}', $alias, $expression);
+                $expression_full = str_replace('{t}', $alias, $details->expression);
                 $unfuse_fields[$field_full] = $expression_full;
             }
         }
@@ -1014,7 +1014,7 @@ class Linetype
         }
 
         if (!$is || !$was) {
-            foreach ($unfuse_fields as $field => $expression) {
+            foreach (array_keys($unfuse_fields) as $field) {
                 if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
                     unset($unfuse_fields[$field]);
                 }

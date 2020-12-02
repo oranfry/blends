@@ -43,13 +43,28 @@ class token extends \Linetype
             ],
         ];
         $this->unfuse_fields = [
-            '{t}.token' => ':{t}_token',
-            '{t}.ttl' => ':{t}_ttl',
+            '{t}.token' => (object) [
+                'expression' => ':{t}_token',
+                'type' => 'char(64)',
+            ],
+            '{t}.ttl' => (object) [
+                'expression' => ':{t}_ttl',
+                'type' => 'int',
+            ],
+            '{t}.used' => (object) [
+                'expression' => 'now()',
+                'type' => 'timestamp',
+            ],
+            '{t}.hits' => (object) [
+                'expression' => ':{t}_hits',
+                'type' => 'int',
+            ],
         ];
     }
 
     function complete($line)
     {
-        $line->ttl = $line->ttl ?? 3600;
+        $line->ttl = @$line->ttl ?? 3600;
+        $line->hits = @$line->hits ?? 0;
     }
 }

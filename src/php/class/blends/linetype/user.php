@@ -39,9 +39,18 @@ class user extends \Linetype
             ],
         ];
         $this->unfuse_fields = [
-            '{t}.username' => ':{t}_username',
-            '{t}.salt' => 'if(:{t}_password is null, {t}.salt, :{t}_salt)',
-            '{t}.password' => 'ifnull(:{t}_password, {t}.password)',
+            '{t}.username' => (object) [
+                'expression' => ':{t}_username',
+                'type' => 'varchar(255)',
+            ],
+            '{t}.salt' => (object) [
+                'expression' => 'if(:{t}_password is null, {t}.salt, :{t}_salt)',
+                'type' => 'char(4)',
+            ],
+            '{t}.password' => (object) [
+                'expression' => 'ifnull(:{t}_password, {t}.password)',
+                'type' => 'char(64)',
+            ],
         ];
     }
 
