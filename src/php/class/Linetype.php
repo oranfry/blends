@@ -426,6 +426,7 @@ class Linetype
                         foreach ($line->{$child->label} as $childline) {
                             $parentaliasshort = $child->parent_link . '_' . $this->name;
                             $childline->{$parentaliasshort} = $line->id;
+                            $childline->user = @$line->user;
                         }
 
                         Linetype::load($token, $child->linetype)->_save($token, $line->{$child->label}, $timestamp, $keep_filedata, $commits);
