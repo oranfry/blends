@@ -96,14 +96,14 @@ class Blend
                     if (in_array($groupby_field->type, ['date', 'text'])) {
                         return
                             strcmp($a->{$fieldname}, $b->{$fieldname}) ?:
-                            ($a->id - $b->id) ?:
+                            strcmp($a->id, $b->id) ?:
                             0;
                     }
 
                     if ($groupby_field->type == 'number') {
                         return
                             ($a->{$fieldname} <=> $b->{$fieldname}) ?:
-                            ($a->id - $b->id) ?:
+                            strcmp($a->id, $b->id) ?:
                             0;
                     }
 
