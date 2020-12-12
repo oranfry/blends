@@ -1,18 +1,52 @@
 <?php
 class Repeater
 {
-    public function __construct($period, $pegdate, $n, $day, $month, $round, $ff, $offsetSign, $offsetMagnitude, $offsetPeriod)
+    private $period;
+    private $pegdate;
+    private $n;
+    private $day;
+    private $month;
+    private $round;
+    private $ff;
+    private $offsetSign;
+    private $offsetMagnitude;
+    private $offsetPeriod;
+
+    public function __construct($period, $pegdate, $n, $day, $month, $round, $fastforward, $offsetSign, $offsetMagnitude, $offsetPeriod)
     {
-        $this->period = $period;
-        $this->pegdate = $pegdate;
-        $this->n = $n;
-        $this->day = $day;
-        $this->month = $month;
-        $this->round = $round;
-        $this->ff = $ff;
-        $this->offsetSign = $offsetSign;
-        $this->offsetMagnitude = $offsetMagnitude;
-        $this->offsetPeriod = $offsetPeriod;
+        switch ($period) {
+            case 'day':
+                $this->period = 'day';
+                $this->n = $n;
+                $this->pegdate = $pegdate;
+                $this->fastforward = $fastforward;
+                break;
+
+            case 'month':
+                $this->period = 'month';
+                $this->day = $day;
+                $this->round = $round;
+                $this->fastforward = $fastforward;
+                $this->offsetSign = $offsetSign;
+                $this->offsetMagnitude = $offsetMagnitude;
+                $this->offsetPeriod = $offsetPeriod;
+                break;
+
+            case 'year':
+                $this->period = 'year';
+                $this->month = $month;
+                $this->day = $day;
+                $this->round = $round;
+                $this->fastforward = $fastforward;
+                $this->offsetSign = $offsetSign;
+                $this->offsetMagnitude = $offsetMagnitude;
+                $this->offsetPeriod = $offsetPeriod;
+
+                break;
+
+            default:
+                error_response("Invalid period");
+        }
     }
 
     static function create($serialised)
@@ -53,6 +87,60 @@ class Repeater
         }
 
         return new static($period, $pegdate, $n, $day, $month, $round, $ff, $offsetSign, $offsetMagnitude, $offsetPeriod);
+    }
+
+    public function generate_dates($from, $to)
+    {
+        if ($this->offsetPeriod) {
+            $offsetSignNegated = $this->offsetSign == '-' ? '+' : '-';
+        }
+
+        $start = $from;
+        $end = $to;
+
+        if ($this->offsetPeriod && $this->offsetMagnitude) {
+            $start = date_shift($start, "{$offsetSignNegated}{$this->offsetMagnitude} {$this->offsetPeriod}");
+            $end = date_shift($end, "{$offsetSignNegated}{$this->offsetMagnitude} {$this->offsetPeriod}");
+        }
+
+        if ($this->fastforward) {
+            $start = date_shift($start, "-6 day");
+            $end = date_shift($end, "-6 day");
+        }
+
+        $dates = [];
+
+        for ($d = $start; $d <= $end; $d = date_shift($d, '+1 day')) {
+            if ($this->period == 'day') {
+                $a = strtotime("{$d} 00:00:00 +0000") / 86400;
+                $b = strtotime("{$this->pegdate} 00:00:00 +0000") / 86400;
+
+                if (($a - $b) % $this->n == 0) {
+                    $dates[] = $d;
+                }
+            } elseif (
+                preg_replace('/.*-/', '', $d) == ($this->round ? min($this->day, date('t', strtotime($d))) : $this->day) &&
+                ($this->period != 'year' || preg_replace('/.*-(.*)-.*/', '$1', $d) == $this->month)
+            ) {
+                $dates[] = $d;
+            }
+        }
+
+        // fastforward and offset
+
+        for ($i = 0; $i < count($dates); $i++) {
+            if ($this->fastforward) {
+                while (date('w', strtotime($dates[$i])) != $this->fastforward - 1) {
+                    $dates[$i] = date_shift($dates[$i], "+1 day");
+                }
+            }
+
+            if ($this->offsetPeriod && $this->offsetMagnitude) {
+                $dates[$i] = date_shift($dates[$i], "{$this->offsetSign}{$this->offsetMagnitude} {$this->offsetPeriod}");
+            }
+        }
+
+        return $dates;
     }
 
     public function get_clause($field_name)

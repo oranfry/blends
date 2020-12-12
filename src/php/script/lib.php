@@ -5,6 +5,27 @@ const ESC = "\x1b";
 const GS = "\x1d";
 const NUL = "\x00";
 
+function check_date($date, &$failReason = null)
+{
+    if (!preg_match('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $date, $groups)) {
+        $failReason = 'invalid format';
+
+        return false;
+    }
+
+    array_shift($groups);
+
+    list($year, $month, $day) = $groups;
+
+    if (!checkdate($month, $day, $year)) {
+        $failReason = 'no such date';
+
+        return false;
+    }
+
+    return true;
+}
+
 function commit($timestamp, $linetype, $data)
 {
     if (!count($data)) {

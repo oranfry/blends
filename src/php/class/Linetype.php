@@ -680,6 +680,41 @@ class Linetype
         }
     }
 
+    public function add($token, Repeater $repeater, $from, $to, $template, $keep_filedata = false)
+    {
+        $datefield = null;
+
+        foreach ($this->fields as $field) {
+            if ($field->type == 'date') {
+                $datefield = $field;
+
+                break; //use the first
+            }
+        }
+
+        if (!$datefield) {
+            error_response('Line Add: linetype does not have a date field');
+        }
+
+        if (!check_date($from)) {
+            error_response('Line Add: invalid "from" date');
+        }
+
+        if (!check_date($to)) {
+            error_response('Line Add: invalid "to" date');
+        }
+
+        $lines = [];
+
+        foreach ($repeater->generate_dates($from, $to) as $date) {
+            $line = clone $template;
+            $line->{$datefield->name} = $date;
+            $lines[] = $line;
+        }
+
+        $this->save($token, $lines, null, $keep_filedata);
+    }
+
     public function ashtml($line)
     {
         $text = $this->astext($line);
