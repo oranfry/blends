@@ -70,8 +70,6 @@ class Blend
             $_records = $linetype->find_lines($token, $_filters);
 
             foreach ($_records as $record) {
-                $record->type = @$this->hide_types[$linetype->name] ?: $linetype->name;
-
                 foreach ($this->fields as $field) {
                     if (!property_exists($record, $field->name)) {
                         if (!property_exists($field, 'default')) {
