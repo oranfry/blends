@@ -947,6 +947,14 @@ class Linetype
         foreach ($filters as $filter) {
             $filter = clone $filter;
 
+            if ($filter->field == 'type') {
+                if ($this->name != $filter->value) {
+                    return false;
+                }
+
+                continue;
+            }
+
             if ($filter->field == 'deepid') {
                 $filter->field = 'id';
                 $ids = [];
