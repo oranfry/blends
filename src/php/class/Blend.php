@@ -54,10 +54,6 @@ class Blend
             return Linetype::load($token, $linetype_name);
         }, $this->linetypes);
 
-        if (@$this->groupby) {
-            $groupfield = $this->groupby;
-        }
-
         $records = [];
 
         foreach ($linetypes as $linetype) {
@@ -82,32 +78,6 @@ class Blend
             }
 
             $records = array_merge($records, $_records);
-        }
-
-        if ($groupfield) {
-            $groupby_field = @filter_objects($this->fields, 'name', 'is', $groupfield)[0];
-
-            if ($groupby_field) {
-                usort($records, function ($a, $b) use ($groupby_field) {
-                    $fieldname = $groupby_field->name;
-
-                    if (in_array($groupby_field->type, ['date', 'text'])) {
-                        return
-                            strcmp($a->{$fieldname}, $b->{$fieldname}) ?:
-                            strcmp($a->id, $b->id) ?:
-                            0;
-                    }
-
-                    if ($groupby_field->type == 'number') {
-                        return
-                            ($a->{$fieldname} <=> $b->{$fieldname}) ?:
-                            strcmp($a->id, $b->id) ?:
-                            0;
-                    }
-
-                    error_response("cant sort by {$fieldname}, type {$groupby_field->type}");
-                });
-            }
         }
 
         return  $records;
