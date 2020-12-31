@@ -44,7 +44,7 @@ class Blend
         }
     }
 
-    public function search($token, $filters)
+    public function search($token, $filters = [])
     {
         if (!Blends::verify_token($token)) {
             return false;
