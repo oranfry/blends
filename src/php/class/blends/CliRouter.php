@@ -12,5 +12,6 @@ class CliRouter extends \Router
         'CLI reset-schema' =>           [null, 'PAGE' => 'cli/reset-schema', 'LAYOUT' => 'cli', 'AUTHSCHEME' => 'onetime'],
         'CLI h2n \S+ \S+' =>            [null, 'TABLE', 'H', 'PAGE' => 'cli/h2n', 'AUTHSCHEME' => 'none', 'LAYOUT' => 'cli'],
         'CLI n2h \S+ \S+' =>            [null, 'TABLE', 'N', 'PAGE' => 'cli/n2h', 'AUTHSCHEME' => 'none', 'LAYOUT' => 'cli'],
+        'CLI save \S+' =>               [null, 'LINETYPE', 'PAGE' => 'cli/save', 'LAYOUT' => 'cli', 'AUTHSCHEME' => 'onetime'],
    ];
 }
