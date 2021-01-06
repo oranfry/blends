@@ -828,7 +828,9 @@ class Linetype
             } else {
                 $line->{$field->name} = $row["{$alias}_{$field->name}"];
             }
+        }
 
+        foreach ($this->fields as $field) {
             if (!$summary && property_exists($field, 'calc')) {
                 $line->{$field->name} = ($field->calc)($line);
             }
