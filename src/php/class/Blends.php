@@ -82,7 +82,9 @@ class Blends
         static::$verified_tokens[$token] = $token_object; // we are authorised before the token even hits the db
 
         if (!$one_time) {
-            $token_objects = Linetype::load(null, 'token')->save($token, [$token_object]);
+            $token_linetype = Linetype::load(null, 'token');
+            $token_linetype->complete($token_object);
+            $token_objects = $token_linetype->save($token, [$token_object]);
 
             if (!count($token_objects)) {
                 error_response('Login Error (2)', 500);

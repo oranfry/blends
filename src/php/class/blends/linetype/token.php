@@ -61,14 +61,12 @@ class token extends \Linetype
             '{t}.ttl' => function($line) : int {
                 return $line->ttl;
             },
-            '{t}.used' => (object) [
-                'expression' => 'now()',
-                'type' => 'timestamp',
-            ],
-            '{t}.hits' => (object) [
-                'expression' => ':{t}_hits',
-                'type' => 'int',
-            ],
+            '{t}.used' => function($line) : int {
+                return time();
+            },
+            '{t}.hits' => function($line) : int {
+                return @$line->hits ?? 0;
+            },
         ];
     }
 

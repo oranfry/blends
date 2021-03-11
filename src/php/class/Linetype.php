@@ -341,7 +341,9 @@ class Linetype
         $oldids = [];
 
         foreach ($lines as $i => $line) {
-            $oldids[$i] = @$line->id;
+            if (@$line->id) {
+                $oldids[$i] = @$line->id;
+            }
         }
 
         if (count($oldids)) {
