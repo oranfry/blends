@@ -151,12 +151,15 @@ class Linetype
             $joins[] = "join record_user u on u.user = :user";
         }
 
-        $select = implode(', ', $selects);
+        echo '<pre>';
+        var_export($selects);
+
+        // $select = implode(', ', $selects);
         $join = implode(' ', $joins);
         $where = count($wheres) ? 'where ' . implode(' AND ', array_map(function($c){ return "({$c})"; }, $wheres)) : '';
         $orderby = implode(', ', $orderbys);
 
-        $q = "select {$select} from `{$dbtable}` t {$join} {$where} order by {$orderby}";
+        $q = "select {\$select} from `{$dbtable}` t {$join} {$where} order by {$orderby}";
 
         $stmt = Db::prepare($q);
         $result = $stmt->execute(['user' => $user]);
@@ -188,8 +191,8 @@ class Linetype
     private function _find_r($token, $alias, &$selects, &$joins, &$wheres, $summary = false)
     {
         if (!$summary) {
-            $selects[] = "{$alias}.id {$alias}_id";
-            $selects[] = "{$alias}.user {$alias}_user";
+            $selects["{$alias}_id"] = function ($data) { return $data->{"{$alias}.id"}; };
+            $selects["{$alias}_user"] = function ($data) { return $data->{"{$alias}.user"}; };
         }
 
         $user = Blends::token_user($token);
@@ -205,7 +208,7 @@ class Linetype
                 continue;
             }
 
-            $selects[] = $fuse . " `{$alias}_{$field->name}`";
+            $selects["{$alias}_{$field->name}"] = $fuse;
         }
 
         foreach (@$this->inlinelinks ?? [] as $child) {
@@ -233,7 +236,7 @@ class Linetype
                 $parentalias = $alias . '_'  . $parentaliasshort;
 
                 $joins[] = make_join($token, $tablelink, $parentalias, $alias, $side, $leftJoin);
-                $selects[] = "{$parentalias}.id {$parentalias}_id";
+                $selects["{$parentalias}_id"] = function ($data) { return $data->{"{$parentalias}.id"}; };
             }
         }
 
@@ -1126,7 +1129,7 @@ class Linetype
         }
 
         if (@$field->fuse) {
-            $raw = $field->fuse;
+            return $field->fuse;
         } elseif (@$field->borrow) {
             $raw = $field->borrow;
             $this->borrow_r($token, $alias, 't', $raw);
