@@ -2,121 +2,18 @@
 class Linetype
 {
     public $children = [];
-    public $links = [];
-    public $links_reversed = [];
-    public $links_required = [];
     public $clause;
-    public $icon = 'doc';
-    public $table;
     public $fields = [];
     public $fuse_fields = [];
-    public $unfuse_fields = [];
+    public $icon = 'doc';
     public $label;
+    public $links = [];
+    public $links_required = [];
+    public $links_reversed = [];
+    public $table;
+    public $unfuse_fields = [];
 
     private static $incoming_links = null;
-
-    public static function load($token, $name)
-    {
-        $linetypeclass = @BlendsConfig::get($token)->linetypes[$name]->class;
-
-        if (!$linetypeclass) {
-            error_response("No such linetype '{$name}'");
-        }
-
-        $linetype = new $linetypeclass();
-        $linetype->name = $name;
-
-        return $linetype;
-    }
-
-    public final function find_incoming_links($token)
-    {
-        if (self::$incoming_links == null) {
-            self::$incoming_links = [];
-
-            foreach (BlendsConfig::get($token)->linetypes as $name => $class) {
-                $linetype = Linetype::load($token, $name);
-
-                foreach ($linetype->children as $child) {
-                    $link = clone $child;
-                    $link->parent_linetype = $name;
-
-                    if (!isset(self::$incoming_links[$child->linetype])) {
-                        self::$incoming_links[$child->linetype] = [];
-                    }
-
-                    self::$incoming_links[$child->linetype][] = $link;
-                }
-            }
-        }
-
-        return @self::$incoming_links[$this->name] ?: [];
-    }
-
-    public function complete($line)
-    {
-    }
-
-    public function unpack($line)
-    {
-    }
-
-    public function get_suggested_values($token)
-    {
-        return [];
-    }
-
-    public function validate($line)
-    {
-        return [];
-    }
-
-    public function astext($line)
-    {
-    }
-
-    public function ashtml($line)
-    {
-        $text = $this->astext($line);
-
-        if ($text) {
-            return '<pre>' . $text . '</pre>';
-        }
-    }
-
-    public function aspdf($line)
-    {
-        $cmd = "/usr/bin/xvfb-run -- /usr/bin/wkhtmltopdf -s A4 - -";
-        $descriptorspec = [
-           ['pipe', 'r'],
-           ['pipe', 'w'],
-        ];
-
-        $process = proc_open($cmd, $descriptorspec, $pipes, '/tmp');
-
-        if (!is_resource($process)) {
-            error_response('Failed to create pdf (1)');
-        }
-
-        fwrite($pipes[0], $this->ashtml($line));
-        fclose($pipes[0]);
-
-        $filedata = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-
-        $return_value = proc_close($process);
-
-        return $filedata;
-    }
-
-    public function delete($token, $filters)
-    {
-        if (!Blends::verify_token($token)) {
-            return false;
-        }
-
-        $this->_delete($token, $filters);
-    }
 
     private function _delete($token, $filters)
     {
@@ -130,68 +27,286 @@ class Linetype
         $this->save($token, $lines);
     }
 
-    public function print($token, $filters)
+    private function _delete_file($line, $field)
+    {
+        $shortpath = $this->file_path($line, $field);
+        $filepath = FILES_HOME . '/' . $shortpath;
+        $dirs = [];
+
+        for ($parent = dirname($shortpath); $parent != '.'; $parent = dirname($parent)) {
+            array_unshift($dirs, FILES_HOME . '/' . $parent);
+        }
+
+        if (file_exists($filepath)) {
+            unlink($filepath);
+        }
+
+        foreach (array_reverse($dirs) as $dir) {
+            if (is_dir($dir) && dir_is_empty($dir)) {
+                rmdir($dir);
+            }
+        }
+
+        $line->{$field->name} = null;
+    }
+
+    private function _find_lines($token, $filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
     {
         if (!Blends::verify_token($token)) {
             return false;
         }
 
-        return $this->_print($token, $filters);
-    }
+        $user = Blends::token_user($token);
+        $filters = $filters ?? [];
+        $dbtable = @BlendsConfig::get($token)->tables[$this->table];
 
-    private function _print($token, $filters)
-    {
-        $lines = $this->find_lines($token, $filters);
+        if (!$dbtable) {
+            error_response("Could not resolve table {$this->table} to a database table");
+        }
 
-        foreach ($lines as $line) {
-            $this->_load_children($token, $line);
+        $selects = [];
+        $joins = [];
+        $wheres = [];
+        $orderbys = ['t.created'];
+        $groupbys = [];
 
-            $contents = $this->astext($line);
+        foreach ($filters as $filter) {
+            $cmp = @$filter->cmp ?: '=';
 
-            if (!defined('PRINTER_FILE')) {
-                error_log("\n" . $contents);
-                continue; // lets not and say we did - for testing!
+            $is_parentage_filter = (function($linetype, $filter) use ($token) {
+                foreach ($linetype->find_incoming_links($token) as $parent) {
+                    $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
+
+                    if ($filter->field == $parentaliasshort) {
+                        return true;
+                    }
+                }
+            })($this, $filter);
+
+            if ($is_parentage_filter) {
+                $cmpvalue = is_array($filter->value) ? 'in (' . implode(', ', array_map(function($v){ return "'{$v}'"; }, $filter->value)) . ')' : ' = ' . "'{$filter->value}'";
+                $wheres[] = "t_{$filter->field}.id {$cmpvalue}";
+                continue;
             }
 
-            $logofile = @BlendsConfig::get($token)->logofile;
+            if ($cmp == 'custom') {
+                $field = @filter_objects($this->fields, 'name', 'is', $filter->field)[0];
 
-            $printout = '';
-            $printout .= ESC."@"; // Reset to defaults
-
-            if ($logofile && file_exists($logofile)) {
-                $printout .= file_get_contents($logofile);
-                $printout .= "\n\n";
+                $wheres[] = ($filter->sql)(str_replace('{t}', 't', $field->fuse));
+                continue;
             }
 
-            $printout .= wordwrap($contents, 42, "\n", true);
-            $printout .= ESC."d".chr(4);
-            $printout .= GS."V\x41".chr(3);
+            if ($filter->field == 'id') {
+                $expression = 't.id';
+            } elseif ($filter->field == 'user') {
+                $expression = 't.user';
+            } else {
+                $field = @filter_objects($this->fields, 'name', 'is', $filter->field)[0];
 
-            file_put_contents(PRINTER_FILE, $printout, FILE_APPEND);
+                if (!$field) {
+                    error_response("Cant find fuse expression for filter field {$this->name} {$filter->field} (1)\n\n" . var_export($this->fields, 1));
+                }
+
+                $expression = $this->render_fuse_expression($token, $field->name, 't');
+
+                if (!$expression) {
+                    error_response("Cant find fuse expression for filter field {$this->name} {$filter->field} (2)\n\n" . var_export($this->fields, 1));
+                }
+            }
+
+            if ($cmp == '*=') {
+                $repeater = Repeater::create($filter->value);
+                $wheres[] = $repeater->get_clause($expression);
+            } elseif (is_array($filter->value) && $cmp == '=') {
+                if (count($filter->value)) {
+                    $value =  '(' . implode(',', array_map(function($e){ return "'{$e}'"; }, $filter->value)) . ')';
+                    $wheres[] = "{$expression} in {$value}";
+                } else {
+                    if ($summary) {
+                        return (object) [];
+                    }
+
+                    return [];
+                }
+            } else {
+                $wheres[] = "{$expression} {$cmp} '{$filter->value}'";
+            }
         }
 
-        return ['messages' => ['Printed Happily']];
+        foreach (@$this->clauses ?: [] as $clause) {
+            $wheres[] = str_replace('{t}', 't', $clause);
+        }
+
+        $this->_find_r($token, 't', $selects, $joins, $wheres, $summary);
+
+        if ($parentLink && $parentId) {
+            $tablelink = Tablelink::load($parentLink);
+            $joins[] = make_join($token, $tablelink, 'parent', 't', 0, false);
+            $wheres[] = "parent.id = '{$parentId}'";
+        }
+
+        // top-level join to logged-in user
+
+        if ($user) {
+            $joins[] = "join record_user u on u.user = :user";
+        }
+
+        $select = implode(', ', $selects);
+        $join = implode(' ', $joins);
+        $where = count($wheres) ? 'where ' . implode(' AND ', array_map(function($c){ return "({$c})"; }, $wheres)) : '';
+        $orderby = implode(', ', $orderbys);
+
+        $q = "select {$select} from `{$dbtable}` t {$join} {$where} order by {$orderby}";
+
+        $stmt = Db::prepare($q);
+        $result = $stmt->execute(['user' => $user]);
+
+        if (!$result) {
+            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}");
+        }
+
+        $lines = [];
+
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $line = (object) [];
+
+            $line->type = $this->name;
+
+            $this->build_r($token, 't', $row, $line, $summary, $load_children, $load_files);
+
+            if ($summary) {
+                return $line;
+            }
+
+            $lines[] = $line;
+        }
+
+        return $lines;
     }
 
-    public function save($token, $lines, $timestamp = null, $keep_filedata = false)
+
+    private function _find_r($token, $alias, &$selects, &$joins, &$wheres, $summary = false)
     {
-        if (!Blends::verify_token($token)) {
-            return false;
+        if (!$summary) {
+            $selects[] = "{$alias}.id {$alias}_id";
+            $selects[] = "{$alias}.user {$alias}_user";
         }
 
-        $commits = [];
+        $user = Blends::token_user($token);
 
-        Db::startTransaction();
+        foreach ($this->fields as $field) {
+            if ($summary && !@$field->summary == 'sum') {
+                continue;
+            }
 
-        $data = $this->_save($token, $lines, $timestamp, $keep_filedata, $commits);
+            $fuse = $this->render_fuse_expression($token, $field->name, $alias, $summary);
 
-        foreach ($commits as $commit) {
-            commit($commit->timestamp, $commit->linetype, $commit->data);
+            if (!$fuse) {
+                continue;
+            }
+
+            $selects[] = $fuse . " `{$alias}_{$field->name}`";
         }
 
-        Db::commit();
+        foreach (@$this->inlinelinks ?? [] as $child) {
+            $childlinetype = Linetype::load($token, $child->linetype);
+            $tablelink = Tablelink::load($child->tablelink);
+            $side = @$child->reverse ? 0 : 1;
+            $leftJoin = @$child->required ? false : true;
+            $childalias = $alias . '_'  . (@$child->alias ?? $tablelink->ids[$side]);
 
-        return $data;
+            $joins[] = make_join($token, $tablelink, $childalias, $alias, $side, $leftJoin);
+
+            if (@$child->norecurse) {
+                continue;
+            }
+
+            $childlinetype->_find_r($token, $childalias, $selects, $joins, $wheres, $summary);
+        }
+
+        if (!$summary) {
+            foreach ($this->find_incoming_links($token) as $incoming) {
+                $tablelink = Tablelink::load($incoming->parent_link);
+                $side = @$incoming->reverse ? 1 : 0;
+                $leftJoin = @$child->required ? false : true;
+                $parentaliasshort = $incoming->parent_link . '_' . $incoming->parent_linetype;
+                $parentalias = $alias . '_'  . $parentaliasshort;
+
+                $joins[] = make_join($token, $tablelink, $parentalias, $alias, $side, $leftJoin);
+                $selects[] = "{$parentalias}.id {$parentalias}_id";
+            }
+        }
+
+        if ($user) {
+            $wheres[] = "{$alias}.user = u.user";
+        }
+    }
+
+    private function _load_children($token, $line)
+    {
+        $sets = [];
+
+        foreach ($this->children as $child) {
+            $sets[] = $this->_load_childset($token, $line, $child);
+        }
+
+        return $sets;
+    }
+
+    private function _handle_upload($token, $field, $line)
+    {
+        if (@$line->{$field->name}) {
+            if (@$field->generate_only) {
+                error_response("File field {$this->name}.{$field->name} marked as generate only");
+            }
+
+            $filedata = base64_decode($line->{$field->name});
+
+            if ($filedata === false) {
+                error_response("Failed to base64 decode the uploaded file");
+            }
+
+            if (@$field->mimetype) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+
+                if ($finfo->buffer($filedata) !== $field->mimetype) {
+                    error_response("Uploaded file is of the wrong type");
+                }
+            }
+
+            $this->_save_file($line, $field, $filedata);
+        } elseif (@$line->{"{$field->name}_generate"}) {
+            if (!@$field->generable) {
+                error_response("File field {$this->name}.{$field->name} not marked as generable");
+            }
+
+            $clone = clone $line;
+
+            $this->_load_children($token, $clone);
+            $filedata = $this->aspdf($clone);
+
+            $this->_save_file($line, $field, $filedata);
+        } elseif (@$line->{"{$field->name}_delete"}) {
+            $this->_delete_file($line, $field);
+        } else {
+            return; //nothing to do
+        }
+
+        unset($line->{"{$field->name}_delete"});
+    }
+
+    private function _load_childset($token, $line, $descriptor)
+    {
+        $child_linetype = Linetype::load($token, @$descriptor->linetype);
+        $fields = $child_linetype->fields;
+
+        $line->{$descriptor->label} = $child_linetype->find_lines($token, null, $line->id, $descriptor->parent_link);
+
+        if (filter_objects($child_linetype->fields, 'summary', 'is', 'sum')) {
+            $line->{"{$descriptor->label}_summary"} = $child_linetype->find_lines($token, null, $line->id, $descriptor->parent_link, true);
+        }
+
+        return $line->{$descriptor->label};
     }
 
     private function _save($token, $lines, $timestamp = null, $keep_filedata = false, &$commits = null)
@@ -416,6 +531,7 @@ class Linetype
                         foreach ($line->{$child->label} as $childline) {
                             $parentaliasshort = $child->parent_link . '_' . $this->name;
                             $childline->{$parentaliasshort} = $line->id;
+                            $childline->user = @$line->user;
                         }
 
                         Linetype::load($token, $child->linetype)->_save($token, $line->{$child->label}, $timestamp, $keep_filedata, $commits);
@@ -439,13 +555,68 @@ class Linetype
         return $lines;
     }
 
-    public function unlink($token, $line, $from)
+    private function _print($token, $filters)
     {
-        if (!Blends::verify_token($token)) {
-            return false;
+        $lines = $this->find_lines($token, $filters);
+
+        foreach ($lines as $line) {
+            $this->_load_children($token, $line);
+
+            $contents = $this->astext($line);
+
+            if (!defined('PRINTER_FILE')) {
+                error_log("\n" . $contents);
+                continue; // lets not and say we did - for testing!
+            }
+
+            $logofile = @BlendsConfig::get($token)->logofile;
+
+            $printout = '';
+            $printout .= ESC."@"; // Reset to defaults
+
+            if ($logofile && file_exists($logofile)) {
+                $printout .= file_get_contents($logofile);
+                $printout .= "\n\n";
+            }
+
+            $printout .= wordwrap($contents, 42, "\n", true);
+            $printout .= ESC."d".chr(4);
+            $printout .= GS."V\x41".chr(3);
+
+            file_put_contents(PRINTER_FILE, $printout, FILE_APPEND);
         }
 
-        return $this->_unlink($token, $line, $from);
+        return ['messages' => ['Printed Happily']];
+    }
+
+    private function _save_file($line, $field, $filedata)
+    {
+        $shortpath = $this->file_path($line, $field);
+        $filepath = FILES_HOME . '/' . $shortpath;
+        $dirs = [];
+
+        for ($parent = dirname($shortpath); $parent != '.'; $parent = dirname($parent)) {
+            array_unshift($dirs, FILES_HOME . '/' . $parent);
+        }
+
+        @mkdir(FILES_HOME);
+
+        foreach ($dirs as $dir) {
+            @mkdir($dir);
+        }
+
+        if (!is_dir(dirname($filepath))) {
+            error_response("Failed to create intermediate directories");
+        }
+
+        file_put_contents($filepath, $filedata);
+
+        if (!file_exists($filepath)) {
+            error_response("Failed to create the file for field {$field->name}");
+        }
+
+        $line->{"{$field->name}_path"} = $shortpath;
+        $line->{$field->name} = base64_encode($filedata);
     }
 
     private function _unlink($token, $line, $from)
@@ -470,167 +641,112 @@ class Linetype
         return $this->save($token, [$line]);
     }
 
-    public function build_class_field_fuse($fieldname)
+    private function _upload_r($token, $line)
     {
-        $field = @filter_objects($this->fields, 'name', 'is', $fieldname)[0];
-
-        if (!$field) {
-            return;
+        foreach ($this->fields as $field) {
+            if ($field->type == 'file') {
+                $this->_handle_upload($token, $field, $line);
+            }
         }
 
-        $field->fuse = "if ((" . implode(') or (', $field->clauses) . "), '{$fieldname}', '')";
-    }
-
-    public function find_lines($token, $filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
-    {
-        return $this->_find_lines($token, $filters, $parentId, $parentLink, $summary, $load_children, $load_files);
-    }
-
-    private function _find_lines($token, $filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
-    {
-        if (!Blends::verify_token($token)) {
-            return false;
-        }
-
-        $user = Blends::token_user($token);
-        $filters = $filters ?? [];
-        $dbtable = @BlendsConfig::get($token)->tables[$this->table];
-
-        if (!$dbtable) {
-            error_response("Could not resolve table {$this->table} to a database table");
-        }
-
-        $selects = [];
-        $joins = [];
-        $wheres = [];
-        $orderbys = ['t.created'];
-        $groupbys = [];
-
-        foreach ($filters as $filter) {
-            $cmp = @$filter->cmp ?: '=';
-
-            $is_parentage_filter = (function($linetype, $filter) use ($token) {
-                foreach ($linetype->find_incoming_links($token) as $parent) {
-                    $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
-
-                    if ($filter->field == $parentaliasshort) {
-                        return true;
-                    }
-                }
-            })($this, $filter);
-
-            if ($is_parentage_filter) {
-                $cmpvalue = is_array($filter->value) ? 'in (' . implode(', ', array_map(function($v){ return "'{$v}'"; }, $filter->value)) . ')' : ' = ' . "'{$filter->value}'";
-                $wheres[] = "t_{$filter->field}.id {$cmpvalue}";
+        foreach (@$this->inlinelinks ?? [] as $child) {
+            if (@$child->norecurse) {
                 continue;
             }
 
-            if ($cmp == 'custom') {
-                $field = @filter_objects($this->fields, 'name', 'is', $filter->field)[0];
+            $childtablelink = Tablelink::load($child->tablelink);
 
-                $wheres[] = ($filter->sql)(str_replace('{t}', 't', $field->fuse));
-                continue;
+            if (@$child->reverse) {
+                $childtablelink = $childtablelink->reverse();
             }
 
-            if ($filter->field == 'id') {
-                $expression = 't.id';
-            } elseif ($filter->field == 'user') {
-                $expression = 't.user';
-            } else {
-                $field = @filter_objects($this->fields, 'name', 'is', $filter->field)[0];
+            $childlinetype = Linetype::load($token, $child->linetype);
+            $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
+            $childline = @$line->{$childaliasshort};
 
-                if (!$field) {
-                    error_response("Cant find fuse expression for filter field {$this->name} {$filter->field} (1)\n\n" . var_export($this->fields, 1));
-                }
-
-                $expression = $this->render_fuse_expression($token, $field->name, 't');
-
-                if (!$expression) {
-                    error_response("Cant find fuse expression for filter field {$this->name} {$filter->field} (2)\n\n" . var_export($this->fields, 1));
-                }
+            if ($childline) {
+                $childlinetype->_upload_r($token, $childline);
             }
+        }
+    }
 
-            if ($cmp == '*=') {
-                $repeater = Repeater::create($filter->value);
-                $wheres[] = $repeater->get_clause($expression);
-            } elseif (is_array($filter->value) && $cmp == '=') {
-                if (count($filter->value)) {
-                    $value =  '(' . implode(',', array_map(function($e){ return "'{$e}'"; }, $filter->value)) . ')';
-                    $wheres[] = "{$expression} in {$value}";
-                } else {
-                    if ($summary) {
-                        return (object) [];
-                    }
+    public function add($token, Repeater $repeater, $from, $to, $template, $keep_filedata = false)
+    {
+        $datefield = null;
 
-                    return [];
-                }
-            } else {
-                $wheres[] = "{$expression} {$cmp} '{$filter->value}'";
+        foreach ($this->fields as $field) {
+            if ($field->type == 'date') {
+                $datefield = $field;
+
+                break; //use the first
             }
         }
 
-        foreach (@$this->clauses ?: [] as $clause) {
-            $wheres[] = str_replace('{t}', 't', $clause);
+        if (!$datefield) {
+            error_response('Line Add: linetype does not have a date field');
         }
 
-        $this->_find_r($token, 't', $selects, $joins, $wheres, $summary);
-
-        if ($parentLink && $parentId) {
-            $tablelink = Tablelink::load($parentLink);
-            $joins[] = make_join($token, $tablelink, 'parent', 't', 0, false);
-            $wheres[] = "parent.id = '{$parentId}'";
+        if (!check_date($from)) {
+            error_response('Line Add: invalid "from" date');
         }
 
-        // top-level join to logged-in user
-
-        if ($user) {
-            $joins[] = "join record_user u on u.user = :user";
-        }
-
-        $select = implode(', ', $selects);
-        $join = implode(' ', $joins);
-        $where = count($wheres) ? 'where ' . implode(' AND ', array_map(function($c){ return "({$c})"; }, $wheres)) : '';
-        $orderby = implode(', ', $orderbys);
-
-        $q = "select {$select} from `{$dbtable}` t {$join} {$where} order by {$orderby}";
-
-        $stmt = Db::prepare($q);
-        $result = $stmt->execute(['user' => $user]);
-
-        if (!$result) {
-            error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$q}");
+        if (!check_date($to)) {
+            error_response('Line Add: invalid "to" date');
         }
 
         $lines = [];
 
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $line = (object) [];
-
-            $line->type = $this->name;
-
-            $this->build_r($token, 't', $row, $line, $summary, $load_children, $load_files);
-
-            if ($summary) {
-                return $line;
-            }
-
+        foreach ($repeater->generate_dates($from, $to) as $date) {
+            $line = clone $template;
+            $line->{$datefield->name} = $date;
             $lines[] = $line;
         }
 
-        return $lines;
+        $this->save($token, $lines, null, $keep_filedata);
     }
 
-    private function _find_r($token, $alias, &$selects, &$joins, &$wheres, $summary = false)
+    public function ashtml($line)
     {
-        if (!$summary) {
-            $selects[] = "{$alias}.id {$alias}_id";
-            $selects[] = "{$alias}.user {$alias}_user";
+        $text = $this->astext($line);
+
+        if ($text) {
+            return '<pre>' . $text . '</pre>';
+        }
+    }
+
+    public function aspdf($line)
+    {
+        $cmd = "/usr/bin/xvfb-run -- /usr/bin/wkhtmltopdf -s A4 - -";
+        $descriptorspec = [
+           ['pipe', 'r'],
+           ['pipe', 'w'],
+        ];
+
+        $process = proc_open($cmd, $descriptorspec, $pipes, '/tmp');
+
+        if (!is_resource($process)) {
+            error_response('Failed to create pdf (1)');
         }
 
-        $user = Blends::token_user($token);
+        fwrite($pipes[0], $this->ashtml($line));
+        fclose($pipes[0]);
 
-        foreach ($this->fields as $field) {
-            if ($summary && !@$field->summary == 'sum') {
+        $filedata = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+
+        $return_value = proc_close($process);
+
+        return $filedata;
+    }
+
+    public function astext($line)
+    {
+    }
+
+    private function borrow_r($token, $root, $alias, &$expression)
+    {
+        foreach (@$this->inlinelinks ?: [] as $child) {
+            if (@$child->norecurse) {
                 continue;
             }
 
@@ -645,37 +761,36 @@ class Linetype
         }
 
         foreach (@$this->inlinelinks ?? [] as $child) {
+            $childaliasshort = @$child->alias ?? Tablelink::load($child->tablelink)->ids[@$child->reverse ? 0 : 1];
             $childlinetype = Linetype::load($token, $child->linetype);
-            $tablelink = Tablelink::load($child->tablelink);
-            $side = @$child->reverse ? 0 : 1;
-            $leftJoin = @$child->required ? false : true;
-            $childalias = $alias . '_'  . (@$child->alias ?? $tablelink->ids[$side]);
+            $childalias = "{$alias}_{$childaliasshort}";
 
-            $joins[] = make_join($token, $tablelink, $childalias, $alias, $side, $leftJoin);
+            foreach ($childlinetype->fields ?: [] as $field) {
+                $fuse = $childlinetype->render_fuse_expression($token, $field->name, "{$root}_{$childaliasshort}");
 
-            if (@$child->norecurse) {
-                continue;
+                if ($fuse) {
+                    $expression = str_replace('{' . "{$childalias}_{$field->name}" . '}', $fuse, $expression);
+                }
             }
 
-            $childlinetype->_find_r($token, $childalias, $selects, $joins, $wheres, $summary);
+            $childlinetype->borrow_r(
+                $token,
+                "{$root}_{$childaliasshort}",
+                "{$alias}_{$childaliasshort}",
+                $expression
+            );
+        }
+    }
+
+    public function build_class_field_fuse($fieldname)
+    {
+        $field = @filter_objects($this->fields, 'name', 'is', $fieldname)[0];
+
+        if (!$field) {
+            return;
         }
 
-        if (!$summary) {
-            foreach ($this->find_incoming_links($token) as $incoming) {
-                $tablelink = Tablelink::load($incoming->parent_link);
-                $side = @$incoming->reverse ? 1 : 0;
-                $leftJoin = @$child->required ? false : true;
-                $parentaliasshort = $incoming->parent_link . '_' . $incoming->parent_linetype;
-                $parentalias = $alias . '_'  . $parentaliasshort;
-
-                $joins[] = make_join($token, $tablelink, $parentalias, $alias, $side, $leftJoin);
-                $selects[] = "{$parentalias}.id {$parentalias}_id";
-            }
-        }
-
-        if ($user) {
-            $wheres[] = "{$alias}.user = u.user";
-        }
+        $field->fuse = "if ((" . implode(') or (', $field->clauses) . "), '{$fieldname}', '')";
     }
 
     private function build_r($token, $alias, &$row, $line, $summary = false, $load_children = false, $load_files = false)
@@ -714,7 +829,9 @@ class Linetype
             } else {
                 $line->{$field->name} = $row["{$alias}_{$field->name}"];
             }
+        }
 
+        foreach ($this->fields as $field) {
             if (!$summary && property_exists($field, 'calc')) {
                 $line->{$field->name} = ($field->calc)($line);
             }
@@ -765,6 +882,233 @@ class Linetype
         }
     }
 
+    public function clone_r($token, $line)
+    {
+        $clone = clone $line;
+
+        foreach ($this->children as $child) {
+            if (!property_exists($line, $child->label) || !is_array($line->{$child->label})) {
+                continue;
+            }
+
+            foreach ($line->{$child->label} as $i => $childline) {
+                $line->{$child->label}[$i] = Linetype::load($token, $child->linetype)->clone_r($token, $childline);
+            }
+        }
+
+        foreach (@$this->inlinelinks ?? [] as $child) {
+            if (@$child->norecurse) {
+                continue;
+            }
+
+            $childtablelink = Tablelink::load($child->tablelink);
+
+            if (@$child->reverse) {
+                $childtablelink = $childtablelink->reverse();
+            }
+
+            $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
+            $childline = @$line->{$childaliasshort};
+
+            if ($childline) {
+                $line->{$childaliasshort} = Linetype::load($token, $child->linetype)->clone_r($token, $childline);
+            }
+        }
+
+        return $clone;
+    }
+
+    public function complete($line)
+    {
+    }
+
+    public function delete($token, $filters)
+    {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
+        $this->_delete($token, $filters);
+    }
+
+
+    private function file_path($line, $field)
+    {
+        if (!@$field->path) {
+            error_response("No path defined for file field {$this->name}.{$field->name}");
+        }
+
+        $intermediate = substr($line->id, 0, 3);
+
+        return "{$field->path}/{$intermediate}/{$line->id}.pdf";
+    }
+
+    public function filter_filters($token, $filters, $fields)
+    {
+        $r = [];
+
+        foreach ($filters as $filter) {
+            $filter = clone $filter;
+
+            if ($filter->field == 'type') {
+                if ($this->name != $filter->value) {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if ($filter->field == 'deepid') {
+                $filter->field = 'id';
+                $ids = [];
+
+                foreach ((is_array($filter->value) ? $filter->value : [$filter->value]) as $deepid) {
+                    $parts = explode(':', $deepid);
+                    $type = $parts[0];
+                    $id = $parts[1];
+
+                    if ($type == $this->name) {
+                        $ids[] = $id;
+                    }
+                }
+
+                if (!count($ids)) {
+                    return false;
+                }
+
+                $filter->value = $ids;
+            }
+
+            if (in_array($filter->field, ['id', 'user'])) {
+                $r[] = $filter;
+                continue;
+            }
+
+            // look for standard field
+
+            $linetype_field = @array_values(array_filter($this->fields, function ($v) use ($filter) {
+                return $v->name == $filter->field;
+            }))[0];
+
+            if ($linetype_field) {
+                $r[] = $filter;
+                continue;
+            }
+
+            // try a reference field
+
+            foreach ($this->find_incoming_links($token) as $parent) {
+                $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
+
+                if ($filter->field == $parentaliasshort) {
+                    $r[] = $filter;
+                    continue 2;
+                }
+            }
+
+            // can't find the field, apply default
+
+            $field = @array_values(array_filter($fields, function ($v) use ($filter) {
+                return $v->name == $filter->field;
+            }))[0];
+
+            if (!is_object($field)) {
+                error_response("Filter refers to non-existent field {$filter->field} in linetype {$this->name}");
+            }
+
+            if (
+                $filter->cmp == '=' && (
+                    is_array($filter->value) && !in_array($field->default, $filter->value)
+                    ||
+                    !is_array($filter->value) && $field->default != $filter->value
+                )
+                ||
+                $filter->cmp == 'like' && !preg_match('/' . str_replace('%', '.*', $filter->value) . '/i', $field->default)
+                ||
+                $filter->cmp == 'custom' && !($filter->cmp->php)($field->default)
+            ) {
+                return false;
+            }
+        }
+
+        return $r;
+    }
+
+    public final function find_incoming_links($token)
+    {
+        if (self::$incoming_links == null) {
+            self::$incoming_links = [];
+
+            foreach (BlendsConfig::get($token)->linetypes as $name => $class) {
+                $linetype = Linetype::load($token, $name);
+
+                foreach ($linetype->children as $child) {
+                    $link = clone $child;
+                    $link->parent_linetype = $name;
+
+                    if (!isset(self::$incoming_links[$child->linetype])) {
+                        self::$incoming_links[$child->linetype] = [];
+                    }
+
+                    self::$incoming_links[$child->linetype][] = $link;
+                }
+            }
+        }
+
+        return @self::$incoming_links[$this->name] ?: [];
+    }
+
+    public function find_lines($token, $filters = null, $parentId = null, $parentLink = null, $summary = false, $load_children = false, $load_files = false)
+    {
+        return $this->_find_lines($token, $filters, $parentId, $parentLink, $summary, $load_children, $load_files);
+    }
+
+    public function get_suggested_values($token)
+    {
+        return [];
+    }
+
+    public static function load($token, $name)
+    {
+        $linetypeclass = @BlendsConfig::get($token)->linetypes[$name]->class;
+
+        if (!$linetypeclass) {
+            error_response("No such linetype '{$name}'");
+        }
+
+        $linetype = new $linetypeclass();
+        $linetype->name = $name;
+
+        return $linetype;
+    }
+
+    public function load_children($token, $line)
+    {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
+        return $this->_load_children($token, $line);
+    }
+
+    public function load_childset($token, $line, $descriptor)
+    {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
+        return $this->_load_childset($token, $line, $descriptor);
+    }
+
+    public function print($token, $filters)
+    {
+        if (!Blends::verify_token($token)) {
+            return false;
+        }
+
+        return $this->_print($token, $filters);
+    }
+
     private function render_fuse_expression($token, $fieldname, $alias, $summary = false)
     {
         $raw = null;
@@ -799,74 +1143,25 @@ class Linetype
         return $fuse;
     }
 
-    private function borrow_r($token, $root, $alias, &$expression)
+    public function save($token, $lines, $timestamp = null, $keep_filedata = false)
     {
-        foreach (@$this->inlinelinks ?: [] as $child) {
-            if (@$child->norecurse) {
-                continue;
-            }
-
-            $childaliasshort = @$child->alias ?? Tablelink::load($child->tablelink)->ids[@$child->reverse ? 0 : 1];
-            $childlinetype = Linetype::load($token, $child->linetype);
-            $childalias = "{$alias}_{$childaliasshort}";
-
-            foreach ($childlinetype->fields ?: [] as $field) {
-                $fuse = $childlinetype->render_fuse_expression($token, $field->name, "{$root}_{$childaliasshort}");
-
-                if ($fuse) {
-                    $expression = str_replace('{' . "{$childalias}_{$field->name}" . '}', $fuse, $expression);
-                }
-            }
-
-            $childlinetype->borrow_r(
-                $token,
-                "{$root}_{$childaliasshort}",
-                "{$alias}_{$childaliasshort}",
-                $expression
-            );
-        }
-    }
-
-    private function _handle_upload($token, $field, $line)
-    {
-        if (@$line->{$field->name}) {
-            if (@$field->generate_only) {
-                error_response("File field {$this->name}.{$field->name} marked as generate only");
-            }
-
-            $filedata = base64_decode($line->{$field->name});
-
-            if ($filedata === false) {
-                error_response("Failed to base64 decode the uploaded file");
-            }
-
-            if (@$field->mimetype) {
-                $finfo = new finfo(FILEINFO_MIME_TYPE);
-
-                if ($finfo->buffer($filedata) !== $field->mimetype) {
-                    error_response("Uploaded file is of the wrong type");
-                }
-            }
-
-            $this->_save_file($line, $field, $filedata);
-        } elseif (@$line->{"{$field->name}_generate"}) {
-            if (!@$field->generable) {
-                error_response("File field {$this->name}.{$field->name} not marked as generable");
-            }
-
-            $clone = clone $line;
-
-            $this->_load_children($token, $clone);
-            $filedata = $this->aspdf($clone);
-
-            $this->_save_file($line, $field, $filedata);
-        } elseif (@$line->{"{$field->name}_delete"}) {
-            $this->_delete_file($line, $field);
-        } else {
-            return; //nothing to do
+        if (!Blends::verify_token($token)) {
+            return false;
         }
 
-        unset($line->{"{$field->name}_delete"});
+        $commits = [];
+
+        Db::startTransaction();
+
+        $data = $this->_save($token, $lines, $timestamp, $keep_filedata, $commits);
+
+        foreach ($commits as $commit) {
+            commit($commit->timestamp, $commit->linetype, $commit->data);
+        }
+
+        Db::commit();
+
+        return $data;
     }
 
     private function save_r($token, $alias, $line, $oldline, $tablelink, $parentalias, &$unfuse_fields, &$data, &$statements, &$ids, $timestamp, $keep_filedata)
@@ -974,7 +1269,7 @@ class Linetype
         }
 
         if (!$is || !$was) {
-            foreach ($unfuse_fields as $field => $expression) {
+            foreach (array_keys($unfuse_fields) as $field) {
                 if (preg_match("/^{$alias}\.([a-z_]+)$/", $field, $groups)) {
                     unset($unfuse_fields[$field]);
                 }
@@ -1047,225 +1342,6 @@ class Linetype
         }
     }
 
-    private function _upload_r($token, $line)
-    {
-        foreach ($this->fields as $field) {
-            if ($field->type == 'file') {
-                $this->_handle_upload($token, $field, $line);
-            }
-        }
-
-        foreach (@$this->inlinelinks ?? [] as $child) {
-            if (@$child->norecurse) {
-                continue;
-            }
-
-            $childtablelink = Tablelink::load($child->tablelink);
-
-            if (@$child->reverse) {
-                $childtablelink = $childtablelink->reverse();
-            }
-
-            $childlinetype = Linetype::load($token, $child->linetype);
-            $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
-            $childline = @$line->{$childaliasshort};
-
-            if ($childline) {
-                $childlinetype->_upload_r($token, $childline);
-            }
-        }
-    }
-
-    public function load_children($token, $line)
-    {
-        if (!Blends::verify_token($token)) {
-            return false;
-        }
-
-        return $this->_load_children($token, $line);
-    }
-
-    private function _load_children($token, $line)
-    {
-        $sets = [];
-
-        foreach ($this->children as $child) {
-            $sets[] = $this->_load_childset($token, $line, $child);
-        }
-
-        return $sets;
-    }
-
-    public function load_childset($token, $line, $descriptor)
-    {
-        if (!Blends::verify_token($token)) {
-            return false;
-        }
-;
-        return $this->_load_childset($token, $line, $descriptor);
-    }
-
-    private function _load_childset($token, $line, $descriptor)
-    {
-        $child_linetype = Linetype::load($token, @$descriptor->linetype);
-        $fields = $child_linetype->fields;
-
-        $line->{$descriptor->label} = $child_linetype->find_lines($token, null, $line->id, $descriptor->parent_link);
-
-        if (filter_objects($child_linetype->fields, 'summary', 'is', 'sum')) {
-            $line->{"{$descriptor->label}_summary"} = $child_linetype->find_lines($token, null, $line->id, $descriptor->parent_link, true);
-        }
-
-        return $line->{$descriptor->label};
-    }
-
-    public function filter_filters($token, $filters, $fields)
-    {
-        $r = [];
-
-        foreach ($filters as $filter) {
-            $filter = clone $filter;
-
-            if ($filter->field == 'deepid') {
-                $filter->field = 'id';
-                $ids = [];
-
-                foreach ((is_array($filter->value) ? $filter->value : [$filter->value]) as $deepid) {
-                    $parts = explode(':', $deepid);
-                    $type = $parts[0];
-                    $id = $parts[1];
-
-                    if ($type == $this->name) {
-                        $ids[] = $id;
-                    }
-                }
-
-                if (!count($ids)) {
-                    return false;
-                }
-
-                $filter->value = $ids;
-            }
-
-            if (in_array($filter->field, ['id', 'user'])) {
-                $r[] = $filter;
-                continue;
-            }
-
-            // look for standard field
-
-            $linetype_field = @array_values(array_filter($this->fields, function ($v) use ($filter) {
-                return $v->name == $filter->field;
-            }))[0];
-
-            if ($linetype_field) {
-                $r[] = $filter;
-                continue;
-            }
-
-            // try a reference field
-
-            foreach ($this->find_incoming_links($token) as $parent) {
-                $parentaliasshort = $parent->parent_link . '_' . $parent->parent_linetype;
-
-                if ($filter->field == $parentaliasshort) {
-                    $r[] = $filter;
-                    continue 2;
-                }
-            }
-
-            // can't find the field, apply default
-
-            $field = @array_values(array_filter($fields, function ($v) use ($filter) {
-                return $v->name == $filter->field;
-            }))[0];
-
-            if (!is_object($field)) {
-                error_response("Filter refers to non-existent field {$filter->field} in linetype {$this->name}");
-            }
-
-            if (
-                $filter->cmp == '=' && (
-                    is_array($filter->value) && !in_array($field->default, $filter->value)
-                    ||
-                    !is_array($filter->value) && $field->default != $filter->value
-                )
-                ||
-                $filter->cmp == 'like' && !preg_match('/' . str_replace('%', '.*', $filter->value) . '/i', $field->default)
-                ||
-                $filter->cmp == 'custom' && !($filter->cmp->php)($field->default)
-            ) {
-                return false;
-            }
-        }
-
-        return $r;
-    }
-
-    private function file_path($line, $field)
-    {
-        if (!@$field->path) {
-            error_response("No path defined for file field {$this->name}.{$field->name}");
-        }
-
-        $intermediate = substr($line->id, 0, 3);
-
-        return "{$field->path}/{$intermediate}/{$line->id}.pdf";
-    }
-
-    private function _delete_file($line, $field)
-    {
-        $shortpath = $this->file_path($line, $field);
-        $filepath = FILES_HOME . '/' . $shortpath;
-        $dirs = [];
-
-        for ($parent = dirname($shortpath); $parent != '.'; $parent = dirname($parent)) {
-            array_unshift($dirs, FILES_HOME . '/' . $parent);
-        }
-
-        if (file_exists($filepath)) {
-            unlink($filepath);
-        }
-
-        foreach (array_reverse($dirs) as $dir) {
-            if (is_dir($dir) && dir_is_empty($dir)) {
-                rmdir($dir);
-            }
-        }
-
-        $line->{$field->name} = null;
-    }
-
-    private function _save_file($line, $field, $filedata)
-    {
-        $shortpath = $this->file_path($line, $field);
-        $filepath = FILES_HOME . '/' . $shortpath;
-        $dirs = [];
-
-        for ($parent = dirname($shortpath); $parent != '.'; $parent = dirname($parent)) {
-            array_unshift($dirs, FILES_HOME . '/' . $parent);
-        }
-
-        @mkdir(FILES_HOME);
-
-        foreach ($dirs as $dir) {
-            @mkdir($dir);
-        }
-
-        if (!is_dir(dirname($filepath))) {
-            error_response("Failed to create intermediate directories");
-        }
-
-        file_put_contents($filepath, $filedata);
-
-        if (!file_exists($filepath)) {
-            error_response("Failed to create the file for field {$field->name}");
-        }
-
-        $line->{"{$field->name}_path"} = $shortpath;
-        $line->{$field->name} = base64_encode($filedata);
-    }
-
     public function strip_children($line)
     {
         foreach ($this->children as $child) {
@@ -1332,39 +1408,21 @@ class Linetype
         }
     }
 
-    public function clone_r($token, $line)
+    public function unlink($token, $line, $from)
     {
-        $clone = clone $line;
-
-        foreach ($this->children as $child) {
-            if (!property_exists($line, $child->label) || !is_array($line->{$child->label})) {
-                continue;
-            }
-
-            foreach ($line->{$child->label} as $i => $childline) {
-                $line->{$child->label}[$i] = Linetype::load($token, $child->linetype)->clone_r($token, $childline);
-            }
+        if (!Blends::verify_token($token)) {
+            return false;
         }
 
-        foreach (@$this->inlinelinks ?? [] as $child) {
-            if (@$child->norecurse) {
-                continue;
-            }
+        return $this->_unlink($token, $line, $from);
+    }
 
-            $childtablelink = Tablelink::load($child->tablelink);
+    public function unpack($line)
+    {
+    }
 
-            if (@$child->reverse) {
-                $childtablelink = $childtablelink->reverse();
-            }
-
-            $childaliasshort = (@$child->alias ?? $childtablelink->ids[1]);
-            $childline = @$line->{$childaliasshort};
-
-            if ($childline) {
-                $line->{$childaliasshort} = Linetype::load($token, $child->linetype)->clone_r($token, $childline);
-            }
-        }
-
-        return $clone;
+    public function validate($line)
+    {
+        return [];
     }
 }

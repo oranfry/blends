@@ -75,7 +75,10 @@ class LinetypeHelper
         static::add_field($linetype, $field, $after_field);
 
         foreach ($unfuses ?: [] as $unfuse) {
-            $linetype->unfuse_fields[$unfuse] = $variable;
+            $linetype->unfuse_fields[$unfuse] = (object) [
+                'expression' => $variable,
+                'type' => 'varchar(255)',
+            ];
         }
     }
 

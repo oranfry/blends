@@ -44,7 +44,7 @@ class Blend
         }
     }
 
-    public function search($token, $filters)
+    public function search($token, $filters = [])
     {
         if (!Blends::verify_token($token)) {
             return false;
@@ -53,10 +53,6 @@ class Blend
         $linetypes = array_map(function ($linetype_name) use ($token) {
             return Linetype::load($token, $linetype_name);
         }, $this->linetypes);
-
-        if (@$this->groupby) {
-            $groupfield = $this->groupby;
-        }
 
         $records = [];
 
@@ -70,8 +66,6 @@ class Blend
             $_records = $linetype->find_lines($token, $_filters);
 
             foreach ($_records as $record) {
-                $record->type = @$this->hide_types[$linetype->name] ?: $linetype->name;
-
                 foreach ($this->fields as $field) {
                     if (!property_exists($record, $field->name)) {
                         if (!property_exists($field, 'default')) {
@@ -84,32 +78,6 @@ class Blend
             }
 
             $records = array_merge($records, $_records);
-        }
-
-        if ($groupfield) {
-            $groupby_field = @filter_objects($this->fields, 'name', 'is', $groupfield)[0];
-
-            if ($groupby_field) {
-                usort($records, function ($a, $b) use ($groupby_field) {
-                    $fieldname = $groupby_field->name;
-
-                    if (in_array($groupby_field->type, ['date', 'text'])) {
-                        return
-                            strcmp($a->{$fieldname}, $b->{$fieldname}) ?:
-                            ($a->id - $b->id) ?:
-                            0;
-                    }
-
-                    if ($groupby_field->type == 'number') {
-                        return
-                            ($a->{$fieldname} <=> $b->{$fieldname}) ?:
-                            ($a->id - $b->id) ?:
-                            0;
-                    }
-
-                    error_response("cant sort by {$fieldname}, type {$groupby_field->type}");
-                });
-            }
         }
 
         return  $records;
