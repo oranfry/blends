@@ -64,7 +64,7 @@ class token extends \Linetype
 
     function complete($line)
     {
-        $line->ttl = @$line->ttl ?? 3600;
+        $line->ttl = @$line->ttl ?? 86400;
         $line->hits = @$line->hits ?? 0;
     }
 }
