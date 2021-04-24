@@ -341,17 +341,11 @@ class Linetype
         }
 
         $oldlines = [];
-        $oldids = [];
 
         foreach ($lines as $i => $line) {
             if (@$line->id) {
-                $oldids[$i] = @$line->id;
-            }
-        }
-
-        if (count($oldids)) {
-            foreach ($this->_find_lines($token, [(object)['field' => 'id', 'value' => $oldids]]) as $oldline) {
-                $oldlines[$oldline->id] = $oldline;
+                $oldlines[$line->id] = json_decode(file_get_contents("/home/oran/Desktop/{$this->table}/{$line->id}.json"));
+                $oldlines[$line->id]->id = $line->id;
             }
         }
 
@@ -367,11 +361,9 @@ class Linetype
             $this->save_r($token, 't', $line, $oldline, null, null, $unfuse_fields, $data, $statements, $ids, $timestamp, $keep_filedata);
 
             foreach ($statements as $statement) {
-                @list($statement_table, $record, $saveto) = $statement;
-
-                if ($saveto) {
+                if (@$statement->saveto) {
                     $stmt = Db::prepare("select pointer from sequence_pointer where `table` = :table for update");
-                    $result = $stmt->execute(['table' => $statement_table]);
+                    $result = $stmt->execute(['table' => $statement->table]);
 
                     if (!$result) {
                         Db::rollback();
@@ -382,7 +374,7 @@ class Linetype
 
                     if (!$row) {
                         $stmt = Db::prepare("insert into sequence_pointer values (:table, 1)");
-                        $result = $stmt->execute(['table' => $statement_table]);
+                        $result = $stmt->execute(['table' => $statement->table]);
 
                         if (!$result) {
                             Db::rollback();
@@ -394,7 +386,7 @@ class Linetype
 
                     $inc = 1;
                     $pointer = $row['pointer'];
-                    $table_collisions = @$sequence->collisions[$statement_table] ?? [];
+                    $table_collisions = @$sequence->collisions[$statement->table] ?? [];
 
                     while (in_array($pointer, $table_collisions)) {
                         $pointer++;
@@ -403,14 +395,14 @@ class Linetype
 
                     if ($pointer > @$sequence->max ?? 1) {
                         Db::rollback();
-                        error_response("Sequence for table {$statement_table} exhausted");
+                        error_response("Sequence for table {$statement->table} exhausted");
                     }
 
-                    $id = n2h($statement_table, $pointer);
-                    $ids[$saveto] = $id;
+                    $id = n2h($statement->table, $pointer);
+                    $ids[$statement->saveto] = $id;
 
                     $stmt = Db::prepare("update sequence_pointer set pointer = pointer + :inc where `table` = :table");
-                    $result = $stmt->execute(['table' => $statement_table, 'inc' => $inc]);
+                    $result = $stmt->execute(['table' => $statement->table, 'inc' => $inc]);
 
                     if (!$result) {
                         Db::rollback();
@@ -418,52 +410,36 @@ class Linetype
                     }
                 }
 
-                $id = @$record->id ?? $ids[$saveto];
+                $id = @$statement->record->id ?? $ids[$statement->saveto];
 
-                @mkdir("/home/oran/Desktop/{$statement_table}");
-                file_put_contents("/home/oran/Desktop/{$statement_table}/{$ids[$saveto]}.json", json_encode($record));
+                @mkdir("/home/oran/Desktop/{$statement->table}");
+
+                if ($statement->action == 'create') {
+                    file_put_contents("/home/oran/Desktop/{$statement->table}/{$id}.json", json_encode($statement->record));
+                } elseif ($statement->action == 'delete') {
+                    unlink("/home/oran/Desktop/{$statement->table}/{$id}.json");
+                }
             }
 
             if (count($unfuse_fields)) {
-                $updates = [];
-                $needed_vars = [];
-
-                foreach ($unfuse_fields as $field => $expression) {
-                    $updates[] = "{$field} = {$expression}";
-                    preg_match_all('/:([a-z_]+)/', $expression, $matches);
-
-                    for ($i = 0; $i < count($matches[1]); $i++) {
-                        $needed_vars[] = $matches[1][$i];
-                    }
-                }
-
-                sort($needed_vars);
-                $needed_vars = array_unique($needed_vars);
-
-                $joins = [];
-                $wheres = [];
-                $selects = []; // ignore
-
-                $this->_find_r($token, 't', $selects, $joins, $wheres);
-
-                $join = implode(' ', $joins);
-                $set = implode(', ', $updates);
-
-                $query = "update {$dbtable} t {$join} set {$set} where t.id = :id";
-                $stmt = Db::prepare($query);
-
-                $querydata = ['id' => $line->id];
+                $record = (object) ['id' => $line->id];
 
                 foreach ($needed_vars as $nv) {
-                    $querydata[$nv] = $data[$nv] ?: null;
+                    $record->{$nv} = $data[$nv] ?: null;
                 }
 
-                $result = $stmt->execute($querydata);
+                $statements[] = (object) [
+                    'action' => 'update',
+                    'table' => $this->table,
+                    'record' => $record,
+                ];
 
-                if (!$result) {
-                    Db::rollback();
-                    error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
-                }
+                // $result = $stmt->execute($querydata);
+
+                // if (!$result) {
+                //     Db::rollback();
+                //     error_response("Execution problem\n" . implode("\n", $stmt->errorInfo()) . "\n{$query}\n" . var_export($querydata, true));
+                // }
             }
 
             if (@$line) {
@@ -1190,7 +1166,7 @@ class Linetype
         }
 
         $unfuse_fields["{$alias}.user"] = function($line, $oldline) {
-            return $line->user;
+            return @$line->user;
         };
 
         $is = is_object($line) && !(@$line->_is === false);
@@ -1265,7 +1241,12 @@ class Linetype
                 }
             }
 
-            $statements[] = [$this->table, $record, "{$alias}_id"];
+            $statements[] = (object) [
+                'action' => 'create',
+                'table' => $this->table,
+                'record' => $record,
+                'saveto' => "{$alias}_id",
+            ];
 
             // if ($tablelink) {
             //     $q = "insert into {$tablelink->middle_table} ({$tablelink->ids[0]}_id, {$tablelink->ids[1]}_id) values (:{$parentalias}_id, :{$alias}_id)";
@@ -1335,15 +1316,20 @@ class Linetype
                 $childlinetype->_save($token, $childlines, $timestamp, $keep_filedata, $commits);
             }
 
-            if ($tablelink) {
-                $q = "delete from {$tablelink->middle_table} where {$tablelink->ids[0]}_id = :{$parentalias}_id and {$tablelink->ids[1]}_id = :oldlineid";
-                $querydata = ['oldlineid' => $oldline->id];
-                $statements[] = [$q, $querydata];
-            }
+            // if ($tablelink) {
+            //     $q = "delete from {$tablelink->middle_table} where {$tablelink->ids[0]}_id = :{$parentalias}_id and {$tablelink->ids[1]}_id = :oldlineid";
+            //     $querydata = ['oldlineid' => $oldline->id];
+            //     $statements[] = [$q, $querydata];
+            // }
 
             $q = "delete from {$dbtable} where id = :oldlineid";
-            $querydata = ['oldlineid' => $oldline->id];
-            $statements[] = [$q, $querydata];
+            $record = (object) ['id' => $oldline->id];
+
+            $statements[] = (object) [
+                'action' => 'delete',
+                'table' => $this->table,
+                'record' => $record,
+            ];
         }
     }
 

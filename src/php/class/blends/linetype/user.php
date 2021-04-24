@@ -46,10 +46,10 @@ class user extends \Linetype
             '{t}.username' => function($line, $oldline) : string {
                 return $line->username;
             },
-            '{t}.password' => function($line, $oldline) : string {
+            '{t}.password' => function($line, $oldline) : ?string {
                 return $line->password ?? @$oldline->password;
             },
-            '{t}.salt' => function($line, $oldline) : string {
+            '{t}.salt' => function($line, $oldline) : ?string {
                 return $line->password ? $line->salt : @$oldline->salt;
             },
         ];
