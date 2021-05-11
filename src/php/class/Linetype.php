@@ -1379,6 +1379,16 @@ class Linetype
         }
     }
 
+    public function strip_inline_children($line)
+    {
+        foreach (@$this->inlinelinks ?? [] as $child) {
+            $link = Tablelink::load($child->tablelink);
+            $property = $link->ids[@$link->reverse ? 0 : 1];
+
+            unset($line->{$property});
+        }
+    }
+
     public function strip_r($line)
     {
         unset($line->id);
@@ -1455,4 +1465,10 @@ class Linetype
     {
         return [];
     }
+
+    public function has($line, $child)
+    {
+        return false;
+    }
+
 }

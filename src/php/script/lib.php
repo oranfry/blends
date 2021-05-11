@@ -200,3 +200,14 @@ function n2h($table, $n)
 
     return strtoupper(substr(str_replace($banned, $replace, base64_encode(hex2bin(hash('sha256', $n . '--' . $table . '--' . $sequence_secret)))), 0, 10));
 }
+
+function h2n($table, $h)
+{
+    $sequence = BlendsConfig::get()->sequence;
+
+    for ($n = 1; $n <= $sequence->max; $n++) {
+        if (n2h($table, $n) == $h) {
+            return $n;
+        }
+    }
+}
