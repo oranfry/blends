@@ -8,18 +8,28 @@ class Blend
     public $linetypes = [];
     public $fields = [];
 
+    private static $known = [];
+
     public static function load($token, $name)
     {
-        $blendclass = @BlendsConfig::get($token)->blends[$name];
+        if (!isset(static::$known[$name])) {
+            $blendclass = @BlendsConfig::get($token)->blends[$name];
 
-        if (!$blendclass) {
-            error_response("No such blend '{$name}'");
+            if (!$blendclass) {
+                error_response("No such blend '{$name}'");
+            }
+
+            $blend = new $blendclass();
+            $blend->name = $name;
+
+            if (method_exists($blend, 'init')) {
+                $blend->init($token);
+            }
+
+            static::$known[$name] = $blend;
         }
 
-        $blend = new $blendclass();
-        $blend->name = $name;
-
-        return $blend;
+        return static::$known[$name];
     }
 
     public function delete($token, $filters)

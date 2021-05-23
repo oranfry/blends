@@ -14,6 +14,7 @@ class Linetype
     public $unfuse_fields = [];
 
     private static $incoming_links = null;
+    private static $known = [];
 
     private function _delete($token, $filters)
     {
@@ -1069,16 +1070,24 @@ class Linetype
 
     public static function load($token, $name)
     {
-        $linetypeclass = @BlendsConfig::get($token)->linetypes[$name]->class;
+        if (!isset(static::$known[$name])) {
+            $linetypeclass = @BlendsConfig::get($token)->linetypes[$name]->class;
 
-        if (!$linetypeclass) {
-            error_response("No such linetype '{$name}'");
+            if (!$linetypeclass) {
+                error_response("No such linetype '{$name}'");
+            }
+
+            $linetype = new $linetypeclass();
+            $linetype->name = $name;
+
+            if (method_exists($linetype, 'init')) {
+                $linetype->init($token);
+            }
+
+            static::$known[$name] = $linetype;
         }
 
-        $linetype = new $linetypeclass();
-        $linetype->name = $name;
-
-        return $linetype;
+        return static::$known[$name];
     }
 
     public function load_children($token, $line)
