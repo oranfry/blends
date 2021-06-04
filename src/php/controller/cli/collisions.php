@@ -1,7 +1,7 @@
 <?php
 echo "Finding Collisions\n\n";
 
-$sequence = @Config::get()->sequence;
+$sequence = @BlendsConfig::get()->sequence;
 
 if (!$sequence) {
     error_log('Sequence not set up');
@@ -10,7 +10,7 @@ if (!$sequence) {
 
 $lookup = [];
 $collisions = [];
-$tables = TABLE ? [TABLE] : array_keys(Config::get()->tables);
+$tables = TABLE ? [TABLE] : array_keys(BlendsConfig::get()->tables);
 
 foreach ($tables as $table) {
     $lookup[$table] = [];
