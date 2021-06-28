@@ -35,7 +35,7 @@ class user extends \Linetype
                 return $line->password ?? @$oldline->password;
             },
             'salt' => function($line, $oldline) : ?string {
-                return $line->password ? $line->salt : @$oldline->salt;
+                return @$line->password ? $line->salt : @$oldline->salt;
             },
         ];
     }
