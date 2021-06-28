@@ -11,46 +11,32 @@ class user extends \Linetype
         $this->table = 'user';
         $this->showass = ['list'];
         $this->fields = [
-            (object) [
-                'name' => 'icon',
-                'type' => 'icon',
-                'fuse' => "'person'",
-                'derived' => true,
-            ],
-            (object) [
-                'name' => 'username',
-                'type' => 'text',
-                'fuse' => '{t}.username',
-            ],
-            (object) [
-                'name' => 'updatepassword',
-                'type' => 'text',
-                'fuse' => "''",
-            ],
-            (object) [
-                'name' => 'password',
-                'type' => 'text',
-                'fuse' => "''",
-            ],
-            (object) [
-                'name' => 'salt',
-                'type' => 'text',
-                'fuse' => "''",
-            ],
+            'icon' => function($records) : string {
+                return 'person';
+            },
+            'username' => function($records) : string {
+                return $records['/']->username;
+            },
+            'updatepassword' => function($records) : ?string {
+                return null;
+            },
+            'password' => function($records) : ?string {
+                return null;
+            },
+            'salt' => function($records) : ?string {
+                return null;
+            },
         ];
         $this->unfuse_fields = [
-            '{t}.username' => (object) [
-                'expression' => ':{t}_username',
-                'type' => 'varchar(255)',
-            ],
-            '{t}.salt' => (object) [
-                'expression' => 'if(:{t}_password is null, {t}.salt, :{t}_salt)',
-                'type' => 'char(4)',
-            ],
-            '{t}.password' => (object) [
-                'expression' => 'ifnull(:{t}_password, {t}.password)',
-                'type' => 'char(64)',
-            ],
+            'username' => function($line, $oldline) : string {
+                return $line->username;
+            },
+            'password' => function($line, $oldline) : ?string {
+                return $line->password ?? @$oldline->password;
+            },
+            'salt' => function($line, $oldline) : ?string {
+                return $line->password ? $line->salt : @$oldline->salt;
+            },
         ];
     }
 

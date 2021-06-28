@@ -1,10 +1,10 @@
 <?php
 class Linetype
 {
+    public $borrow = [];
     public $children = [];
     public $clause;
     public $fields = [];
-    public $fuse_fields = [];
     public $icon = 'doc';
     public $label;
     public $links = [];

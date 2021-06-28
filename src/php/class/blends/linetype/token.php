@@ -10,55 +10,42 @@ class token extends \Linetype
         $this->table = 'token';
         $this->showass = ['list'];
         $this->fields = [
-            (object) [
-                'name' => 'icon',
-                'type' => 'icon',
-                'fuse' => "'ticket'",
-                'derived' => true,
-            ],
-            (object) [
-                'name' => 'token',
-                'type' => 'text',
-                'fuse' => "{t}.token",
-            ],
-            (object) [
-                'name' => 'ttl',
-                'type' => 'number',
-                'fuse' => "{t}.ttl",
-            ],
-            (object) [
-                'name' => 'used',
-                'type' => 'timestamp',
-                'fuse' => "{t}.used",
-            ],
-            (object) [
-                'name' => 'hits',
-                'type' => 'number',
-                'fuse' => "{t}.hits",
-            ],
-            (object) [
-                'name' => 'expired',
-                'type' => 'text',
-                'fuse' => "if ({t}.used + interval {t}.ttl second < current_timestamp, 'yes', 'no')",
-            ],
+            'icon' => function($records) : string {
+                return 'ticket';
+            },
+            'token' => function($records) : string {
+                return $records['/']->token;
+            },
+            'ttl' => function($records) : int {
+                return $records['/']->ttl;
+            },
+            'used' => function($records) : int {
+                if (!is_int($records['/']->used)) {
+                    var_dump($record);
+                    die();
+                }
+                return $records['/']->used;
+            },
+            'hits' => function($records) : int {
+                return $records['/']->hits;
+            },
+            'expired' => function($records) : bool {
+                return strtotime($records['/']->used) + $records['/']->ttl < time();
+            },
         ];
         $this->unfuse_fields = [
-            '{t}.token' => (object) [
-                'expression' => ':{t}_token',
-                'type' => 'char(64)',
-            ],
-            '{t}.ttl' => (object) [
-                'expression' => ':{t}_ttl',
-                'type' => 'int',
-            ],
-            '{t}.used' => (object) [
-                'expression' => 'now()',
-                'type' => 'timestamp',
-            ],
-            '{t}.hits' => (object) [
-                'expression' => ':{t}_hits',
-                'type' => 'int',
-            ],
+            'token' => function($line, $oldline) : string {
+                return $line->token;
+            },
+            'ttl' => function($line, $oldline) : int {
+                return $line->ttl;
+            },
+            'used' => function($line, $oldline) : int {
+                return time();
+            },
+            'hits' => function($line, $oldline) : int {
+                return @$line->hits ?? 0;
+            },
         ];
     }
 
